@@ -1,0 +1,16 @@
+{
+    "name": "wechat-bluetooth",
+    "version": "0.0.1",
+    "license": "MIT",
+    "module": "./index.esm.js",
+    "main": "./index.js",
+    "types": "./index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./index.d.ts",
+        "import": "./index.esm.js",
+        "require": "./index.js"
+      }
+    },
+    "peerDependencies": {}
+  }
