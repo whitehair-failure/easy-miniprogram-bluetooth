@@ -55,18 +55,34 @@ class BluetoothManager {
    * @returns {Promise<WechatMiniprogram.GeneralCallbackResult>} Promise化的API调用结果
    * @private
    */
-  private promisify(
-    fn: Function,
-    args?: Record<string, any>
-  ): Promise<WechatMiniprogram.GeneralCallbackResult> {
+  private promisify(fn: Function, args?: Record<string, any>): Promise<any> {
     return new Promise((resolve, reject) => {
       const options = {
         ...(args || {}),
-        success: (res: WechatMiniprogram.GeneralCallbackResult) => resolve(res),
-        fail: (err: WechatMiniprogram.GeneralCallbackResult) => reject(err),
+        success: (res: any) => resolve(res),
+        fail: (err: any) => reject(err),
       };
       fn(options);
     });
+  }
+
+  /**
+   * 获取蓝牙设备信号强度
+   * @param {string} deviceId 要获取信号强度的设备ID
+   */
+  public async getBLEDeviceRSSI(
+    deviceId: string
+  ): Promise<[Error | null, object | null]> {
+    try {
+      const res = await wx.getBLEDeviceRSSI({
+        deviceId,
+      });
+      console.log(`✔ 获取信号强度成功!`);
+      return [null, res];
+    } catch (err: any) {
+      console.log(`✘ 获取信号强度失败！${err}`);
+      return [new Error(errToString(err)), null];
+    }
   }
 
   /**
@@ -76,12 +92,12 @@ class BluetoothManager {
    * @returns {Error} 如果初始化失败，返回错误对象
    * @returns {object} 如果初始化成功，返回初始化结果
    */
-  public async openAdapter(): Promise<[any, object | null]> {
+  public async openAdapter(
+    mode?: "central" | "peripheral"
+  ): Promise<[any, object | null]> {
     console.log(`准备初始化蓝牙适配器...`);
     try {
-      const res = await this.promisify(wx.openBluetoothAdapter, {
-        refreshCache: false,
-      });
+      const res = await wx.openBluetoothAdapter({ mode });
       console.log(`✔ 适配器初始化成功！`);
       return [null, res];
     } catch (err: any) {
@@ -96,13 +112,10 @@ class BluetoothManager {
    * @returns {Error} 如果搜索失败，返回错误对象
    * @returns {object} 如果搜索成功，返回搜索结果
    */
-  public async startSearch(): Promise<[Error | null, object | null]> {
+  public async startSearch(options: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = {}): Promise<[Error | null, object | null]> {
     console.log(`准备搜寻附近的蓝牙外围设备...`);
     try {
-      const res = await this.promisify(wx.startBluetoothDevicesDiscovery, {
-        interval: 1000,
-        allowDuplicatesKey: true,
-      });
+      const res = await wx.startBluetoothDevicesDiscovery(options);
       console.log(`✔ 搜索成功!`);
       return [null, res];
     } catch (err: any) {
@@ -151,33 +164,34 @@ class BluetoothManager {
    * 连接指定的蓝牙设备
    * 连接成功后会自动设置最大传输单元(MTU)为71字节(仅安卓有效)
    * @param {string} deviceId 要连接的设备ID
+   * @param {number} timeout 超时时间，单位 ms，不填表示不会超时
    * @returns {Promise<[Error | null, object | null]>} 返回错误对象和结果
    * @returns {Error} 如果连接失败，返回错误对象
    * @returns {object} 如果连接成功，返回连接结果
    */
   public async connect(
-    deviceId: string
-  ): Promise<[Error | null, object | null]> {
+    deviceId: string,
+    timeout?: number
+  ): Promise<[any | null, object | null]> {
     console.log(`准备连接设备...`);
     try {
-      const res = await this.promisify(wx.createBLEConnection, {
-        deviceId,
-      });
+      const res = await wx.createBLEConnection({ deviceId, timeout });
+
       console.log(`✔ 连接蓝牙成功！`);
 
       // 设置MTU (仅安卓有效)
-      wx.setBLEMTU({
-        deviceId,
-        mtu: 71,
-        success: (res) =>
-          console.log(`setBLEMTU success ${JSON.stringify(res)}`),
-        fail: (err) => console.log(`setBLEMTU fail ${errToString(err)}`),
-      });
+      // wx.setBLEMTU({
+      //   deviceId,
+      //   mtu: 71,
+      //   success: (res) =>
+      //     console.log(`setBLEMTU success ${JSON.stringify(res)}`),
+      //   fail: (err) => console.log(`setBLEMTU fail ${errToString(err)}`),
+      // });
 
       return [null, res];
     } catch (err) {
       console.log(`✘ 连接蓝牙失败！${errToString(err)}`);
-      return [new Error(errToString(err)), null];
+      return [err, null];
     }
   }
 
@@ -193,7 +207,7 @@ class BluetoothManager {
   ): Promise<[Error | null, object | null]> {
     console.log(`断开蓝牙连接...`);
     try {
-      const res = await this.promisify(wx.closeBLEConnection, {
+      const res = await wx.closeBLEConnection({
         deviceId,
       });
       console.log(`✔ 断开蓝牙成功！`);
@@ -281,10 +295,13 @@ class BluetoothManager {
   > {
     console.log(`获取蓝牙设备所有服务...`);
     try {
-      const res = (await this.promisify(wx.getBLEDeviceServices, {
+      const res = (await wx.getBLEDeviceServices({
         deviceId,
       })) as WechatMiniprogram.GetBLEDeviceServicesSuccessCallbackResult;
       console.log(`✔ 获取service成功！`);
+      console.log("service-res", res);
+      console.log("this.serviceUId", this.serviceUId);
+
       return [null, res];
     } catch (err) {
       console.log(`✘ 获取service失败！${errToString(err)}`);
@@ -311,7 +328,7 @@ class BluetoothManager {
   > {
     console.log(`开始获取特征值...`);
     try {
-      const res = (await this.promisify(wx.getBLEDeviceCharacteristics, {
+      const res = (await wx.getBLEDeviceCharacteristics({
         deviceId,
         serviceId,
       })) as WechatMiniprogram.GetBLEDeviceCharacteristicsSuccessCallbackResult;
@@ -341,16 +358,16 @@ class BluetoothManager {
   ): Promise<[Error | null, object | null]> {
     console.log(`准备订阅特征值变化...`);
     try {
-      const res = await this.promisify(wx.notifyBLECharacteristicValueChange, {
+      const res = await wx.notifyBLECharacteristicValueChange({
         deviceId,
         serviceId,
         characteristicId,
         state: true,
       });
-      console.log(`✔ 订阅notify成功！`);
+      console.log(`✔ 订阅特征值成功！`);
       return [null, res];
     } catch (err) {
-      console.log(`✘ 订阅notify失败！${errToString(err)}`);
+      console.log(`✘ 订阅特征值失败！${errToString(err)}`);
       return [new Error(errToString(err)), null];
     }
   }
@@ -369,14 +386,16 @@ class BluetoothManager {
     deviceId: string,
     value: ArrayBuffer,
     serviceId: string = this.serviceUId,
-    characteristicId: string = this.writeCharacteristicId
+    characteristicId: string = this.writeCharacteristicId,
+    writeType?: "write" | "writeNoResponse"
   ): Promise<[Error | null, object | null]> {
     try {
-      const res = await this.promisify(wx.writeBLECharacteristicValue, {
+      const res = await wx.writeBLECharacteristicValue({
         deviceId,
         serviceId,
         characteristicId,
         value,
+        writeType,
       });
       console.log(`✔ 写入数据成功！`);
       return [null, res];

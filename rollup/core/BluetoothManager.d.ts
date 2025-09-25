@@ -30,13 +30,18 @@ declare class BluetoothManager {
      */
     private promisify;
     /**
+   * 获取蓝牙设备信号强度
+   * @param {string} deviceId 要获取信号强度的设备ID
+   */
+    getBLEDeviceRSSI(deviceId: string): Promise<[Error | null, number | null]>;
+    /**
      * 初始化并打开蓝牙适配器
      * 如果蓝牙未开启或未授权，会显示对应的提示框
      * @returns {Promise<[Error | null, object | null]>} 返回错误对象和结果
      * @returns {Error} 如果初始化失败，返回错误对象
      * @returns {object} 如果初始化成功，返回初始化结果
      */
-    openAdapter(): Promise<[Error | null, object | null]>;
+    openAdapter(): Promise<[any, object | null]>;
     /**
      * 开始搜索附近的蓝牙设备
      * @returns {Promise<[Error | null, object | null]>} 返回错误对象和结果

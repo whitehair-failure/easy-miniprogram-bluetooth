@@ -4,7 +4,7 @@ import * as ModbusRtu from "./utils/modbus/modebusRtu" */
 
 interface Device extends WechatMiniprogram.BlueToothDevice {
   isConnect: boolean;
-  isReConnect?: boolean;
+  reconnect?: boolean;
 }
 
 interface BLEHandlerConfig {
@@ -15,9 +15,12 @@ interface BLEHandlerConfig {
 
 interface BLEHandlerConstructor {
   config: BLEHandlerConfig;
+  searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption;
   filterKey?: string[];
-  isReConnect?: boolean; // 设备异常断开是否自动重连
-  reconnectDelay?: number; // 自动重连延时，单位毫秒
+  reconnect?: boolean; // 设备异常断开是否自动重连
+  connectTimeout?: number; // 正常连接的超时时间，单位毫秒
+  maxRetries?: number; // 最大自动重连次数
+  reconnectDelay?: number; // 每次自动重连间隔时间，单位毫秒
   mode?: "single" | "multiple";
 }
 interface ConnectionStateCallbacks {
@@ -40,16 +43,26 @@ interface CharacteristicCheckResult {
  */
 export class BLEHandler {
   private readonly mode: "single" | "multiple";
-
   private readonly bluetoothManager: BluetoothManager;
 
-  public readonly filterKey?: string[] = []; // 过滤关键字
-  public readonly isReConnect: boolean = false; // 设备异常断开是否自动重连
-  public readonly reconnectDelay: number = 1000; // 自动重连延时，单位毫秒
+  private processingConnections: Set<string> = new Set(); // 新增此行
+  // 将 sendResolve 从单个函数改为一个 Map
+  private pendingRequests: Map<string, (result: [Error | null, any]) => void> =
+    new Map();
+  private requestCounter = 0; // 用于生成唯一的请求ID
 
-  public foundDevList: Device[] = []; // 已找到的设备列表
+  public readonly filterKey?: string[] = []; // 过滤关键字
+  public readonly reconnect: boolean = false; // 设备异常断开是否自动重连
+  public readonly connectTimeout?: number; // 蓝牙连接超时时间
+  public readonly maxRetries: number = 3; // 最大自动重连次数
+  public readonly reconnectDelay: number = 3000; // 每次自动重连间隔时间，单位毫秒
+  public readonly searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = {}; // 搜索配置
+
+  public foundDevList: Device[] = []; // 当前已找到的设备列表
   public historyDevList: Device[] = []; // 已找到的设备的历史列表
+  public historyConnectedDevList: Device[] = []; // 连接过的设备的历史列表
   public connectedDevList: Device[] = []; // 已连接的设备列表
+  public reconnectedDevList: Device[] = []; // 正在重连的设备列表
 
   // 蓝牙默认配置
   public readonly config: BLEHandlerConfig = {
@@ -61,7 +74,7 @@ export class BLEHandler {
   // 当前连接的设备
   // 注意：如果是单设备模式，这个属性会被覆盖为当前连接的设备
   // 如果是多设备模式，这个属性会返回第一个设备
-  get connectedDev(): Device | undefined {
+  get connectedSingleDev(): Device | undefined {
     return this.connectedDevList[0];
   }
 
@@ -73,16 +86,19 @@ export class BLEHandler {
    * @param {BLEHandlerConstructor} options 配置选项
    * @param {BLEHandlerConfig} options.config 蓝牙特征值配置
    * @param {string[]} [options.filterKey] 设备名称过滤关键字
-   * @param {boolean} [options.isReConnect] 设备断开是否自动重连
+   * @param {boolean} [options.reconnect] 设备断开是否自动重连
    * @param {number} [options.reconnectDelay] 自动重连延时(毫秒)
    * @param {"single" | "multiple"} [options.mode] 连接模式：单设备/多设备
    */
   constructor(options: BLEHandlerConstructor) {
     this.mode = options.mode || "single"; // 默认单设备模式
     this.filterKey = options.filterKey;
-    this.isReConnect = options.isReConnect || false; // 默认不自动重连
-    this.reconnectDelay = options.reconnectDelay || 1000; // 默认1秒重连
+    this.reconnect = options.reconnect || false; // 默认不自动重连
+    this.connectTimeout = options.connectTimeout; // 重连超时时间
+    this.maxRetries = options.maxRetries || 3; // 默认最大重连次数为3
+    this.reconnectDelay = options.reconnectDelay || 3000; // 默认每隔3秒重连一次
 
+    this.searchOption = options.searchOption || {};
     this.config = options.config;
 
     this.bluetoothManager = new BluetoothManager({
@@ -93,6 +109,52 @@ export class BLEHandler {
   }
 
   /**
+   * 超时控制 Promise
+   * @param promise 原始 Promise
+   * @param timeout 超时时间（默认 6000ms）
+   */
+  private withTimeout<T>(promise: Promise<T>, timeout = 6000): Promise<T> {
+    let timeoutId: number;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Timeout")), timeout);
+    });
+
+    // 保证清理定时器
+    return Promise.race([
+      Promise.resolve(promise).finally(() => clearTimeout(timeoutId)),
+      timeoutPromise,
+    ]);
+  }
+
+  /**
+   * 检查蓝牙开启状态和权限授予状态
+   * @returns {Promise<boolean>} 是否成功打开适配器
+   */
+  async checkBLEAdapter() {
+    let [err, res] = await this.bluetoothManager.openAdapter();
+
+    if (err != null) {
+      // 如果打开适配器失败，提示用户检查权限或蓝牙状态
+      if (err?.errno === 103) {
+        return {
+          errno: err.errno,
+          errMsg: "请检查是否已授权小程序蓝牙权限",
+        };
+      }
+      if (err?.errno === 1500102) {
+        return {
+          errno: err.errno,
+          errMsg: "请检查蓝牙是否开启",
+        };
+      }
+      return err; // 其他错误直接返回
+    }
+    // {errno:0,errMsg:"openBLuetoothAdapter:ok"}
+    return res;
+  }
+
+  /**
    * 初始化并打开蓝牙适配器
    * @returns {Promise<boolean>} 是否成功打开适配器
    */
@@ -100,36 +162,10 @@ export class BLEHandler {
     let [err, res] = await this.bluetoothManager.openAdapter();
 
     if (err != null) {
-      // 如果打开适配器失败，提示用户检查权限或蓝牙状态
-      setTimeout(() => {
-        if (err?.errno === 103) {
-          wx.showModal({
-            title: "请检查是否已授权小程序蓝牙权限",
-            showCancel: false,
-            success: (res) => {
-              if (res.confirm) {
-                this.openBLEAdapter();
-              }
-            },
-          });
-        }
-        if (err?.errno === 1500102) {
-          wx.showModal({
-            title: "请检查蓝牙是否开启",
-            showCancel: false,
-            success: (res) => {
-              if (res.confirm) {
-                this.openBLEAdapter();
-              }
-            },
-          });
-        }
-      }, 1000);
-
-      console.error("openAdapter", err);
-      return false;
+      console.error(err);
+      return [err, res]; // 打开适配器失败
     }
-    return true;
+    return [err, res];
   }
 
   /**
@@ -137,7 +173,7 @@ export class BLEHandler {
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
   async startSearchBLE() {
-    let [err, res] = await this.bluetoothManager.startSearch();
+    let [err, res] = await this.bluetoothManager.startSearch(this.searchOption);
     return [err, res];
   }
 
@@ -148,7 +184,7 @@ export class BLEHandler {
   onBluetoothFound(callback?: (devices: Device[]) => void) {
     wx.onBluetoothDeviceFound((res) => {
       // console.log("this.filterKey", this.filterKey);
-      // console.log("res.devices", res.devices);
+      console.log("res.devices", res.devices);
 
       res.devices.forEach((device) => {
         let isTarget = true;
@@ -163,7 +199,7 @@ export class BLEHandler {
         ) {
           this.historyDevList.push({
             ...device,
-            isReConnect: this.isReConnect,
+            reconnect: this.reconnect,
             isConnect: false,
           });
         }
@@ -176,7 +212,7 @@ export class BLEHandler {
 
           this.foundDevList.push({
             ...device,
-            isReConnect: this.isReConnect,
+            reconnect: this.reconnect,
             isConnect: false,
           });
         }
@@ -193,7 +229,7 @@ export class BLEHandler {
 
         const realTimeDevices = filteredDevices.map((device) => ({
           ...device,
-          isReConnect: this.isReConnect,
+          reconnect: this.reconnect,
           isConnect: false, // 初始状态为未连接
         }));
 
@@ -222,10 +258,14 @@ export class BLEHandler {
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
   async connectBLE(dev: Device) {
-    if (this.mode === "single" && this.connectedDevList.length > 0) {
+    if (
+      this.mode === "single" &&
+      this.connectedSingleDev?.deviceId != dev.deviceId &&
+      this.connectedSingleDev?.isConnect == true
+    ) {
       // 如果是单设备模式，先断开当前连接的设备
       let [disErr, disRes] = await this.disconnectBLE(
-        this.connectedDev?.deviceId || ""
+        this.connectedSingleDev?.deviceId || ""
       ); // 断开当前连接的设备
       // 如果断开连接失败，返回错误
       if (disErr || !disRes) {
@@ -233,22 +273,91 @@ export class BLEHandler {
       }
     }
 
-    let [err, res] = await this.bluetoothManager.connect(dev.deviceId);
-    if (!err) {
-      if (this.mode === "single") {
-        // 如果是单设备模式，清空已连接设备列表
-        this.connectedDevList = [];
-        this.connectedDevList.push(dev);
-      } else {
-        let index = this.connectedDevList.findIndex(
+    /* if (this.connectedDevList.find((d) => d.deviceId === dev.deviceId)) {
+      // 如果设备已经在已连接列表中，直接返回成功
+      console.log(`设备 ${dev.name}(${dev.deviceId}) 已经连接`);
+      return [null, { deviceId: dev.deviceId, connected: true }];
+    } */
+
+    try {
+      // 连接设备
+      let [err, res] = await this.withTimeout(this.bluetoothManager.connect(dev.deviceId, this.connectTimeout), this.connectTimeout);
+
+      if (res || err.errCode == -1) {
+        dev.isConnect = true; // 更新设备状态为已连接
+        if (this.mode === "single") {
+          // 如果是单设备模式，清空已连接设备列表
+          this.connectedDevList = [];
+          this.connectedDevList.push(dev);
+        } else {
+          let index = this.connectedDevList.findIndex(
+            (d) => d.deviceId === dev.deviceId
+          );
+          if (index === -1) {
+            this.connectedDevList.push(dev);
+          }
+        }
+
+        // 添加历史上已连接过的设备到列表
+        let index = this.historyConnectedDevList.findIndex(
           (d) => d.deviceId === dev.deviceId
         );
         if (index === -1) {
-          this.connectedDevList.push(dev);
+          this.historyConnectedDevList.push(dev);
         }
+
+        await this.getBLEServices();
+        await this.checkCharacteristics(dev.deviceId);
+        await this.notifyBLECharacteristicValueChange(dev.deviceId);
+      }
+      return [err, res];
+    } catch (error) {
+      console.error(`连接设备 ${dev.name}(${dev.deviceId}) 超时失败:`, error);
+      return [error as Error, null];
+    }
+  }
+
+  /**
+   * 处理设备重连
+   * @param device 需要重连的设备
+   * @returns Promise<boolean> 重连是否成功
+   */
+  private async handleDeviceReconnect(device: Device): Promise<boolean> {
+    const maxRetries = this.maxRetries;
+    let retryCount = 0;
+
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`开始第 ${retryCount + 1} 次重连...`);
+
+        // 等待重连延时
+        await new Promise((resolve) =>
+          setTimeout(resolve, this.reconnectDelay)
+        );
+
+        // 尝试重新连接
+        const [err, res] = await this.connectBLE(device);
+        console.log("err", err);
+        console.log("err?.errCode", err?.errCode);
+        console.log("res", res);
+
+        if (res || err?.errCode == -1) {
+          console.log(`设备 ${device.name}(${device.deviceId}) 重连成功`);
+          return true;
+        }
+
+        retryCount++;
+        console.log(`第 ${retryCount} 次重连失败`);
+      } catch (error) {
+        retryCount++;
+        console.error(`第 ${retryCount} 次重连发生错误:`, error);
       }
     }
-    return [err, res];
+
+    console.error(
+      `设备 ${device.name}(${device.deviceId}) 重连失败,已达到最大重试次数`
+    );
+    return false;
   }
 
   /**
@@ -256,7 +365,7 @@ export class BLEHandler {
    * @param {ConnectionStateCallbacks} [callbacks] 设备状态变化时的回调函数
    */
   onBLEConnectionStateChange(callbacks?: ConnectionStateCallbacks): void {
-    wx.onBLEConnectionStateChange((res) => {
+    wx.onBLEConnectionStateChange(async (res) => {
       console.log("onBLEConnectionStateChange", res);
 
       // 自动重连
@@ -270,16 +379,67 @@ export class BLEHandler {
           return;
         }
 
-        let curDev = this.connectedDevList[index];
-
+        this.connectedDevList[index].isConnect = false; // 更新设备状态为未连接
+        const device = this.connectedDevList[index];
         // 如果是异常断开的设备，尝试重新连接
-        if (curDev?.isReConnect) {
-          setTimeout(() => {
-            this.connectBLE(curDev);
-          }, this.reconnectDelay);
+        if (device?.reconnect) {
+          const success = await this.handleDeviceReconnect(device);
+          if (!success) {
+            // 重连失败,从已连接列表中移除
+            this.connectedDevList.splice(index, 1);
+            console.log(`设备 ${device.name} 已从已连接列表中移除`);
+          }
         } else {
+          // 不需要重连,直接移除
           this.connectedDevList.splice(index, 1);
+          console.log(`设备 ${device.name} 断开连接`);
         }
+      } else {
+        console.log("this.connectedDevList", this.connectedDevList);
+        console.log(
+          "this.historyConnectedDevList",
+          this.historyConnectedDevList
+        );
+
+        // 如果该设备已在处理中，则忽略本次回调，防止重复执行
+        if (this.processingConnections.has(res.deviceId)) {
+          return;
+        }
+
+        // 添加“锁”，表示开始处理该设备的连接事件
+        this.processingConnections.add(res.deviceId);
+
+        // 设置一个 500 毫秒的延时，并只执行一次
+        setTimeout(async () => {
+          try {
+            // 检查设备是否已在当前连接列表
+            const isAlreadyConnected = this.connectedDevList.some(
+              (d) => d.deviceId === res.deviceId
+            );
+
+            // 如果设备不在当前连接列表，则从历史记录中恢复
+            if (!isAlreadyConnected) {
+              const deviceFromHistory = this.historyConnectedDevList.find(
+                (d) => d.deviceId === res.deviceId
+              );
+
+              if (deviceFromHistory) {
+                // 从历史记录中找到，添加到当前连接列表
+                console.log(`微信自动重连成功，恢复设备: ${res.deviceId}`);
+                this.connectedDevList.push(deviceFromHistory);
+              } else {
+                // 这是一个未知的、不在历史记录中的设备，强制断开
+                console.warn(
+                  `发现未知设备自动重连: ${res.deviceId}，将强制断开。`
+                );
+                await this.disconnectBLE(res.deviceId);
+              }
+            }
+          } finally {
+            // 无论成功与否，最终都释放“锁”
+            this.processingConnections.delete(res.deviceId);
+          }
+        }, 500); // 延时 500 毫秒
       }
 
       if (callbacks) {
@@ -296,52 +456,98 @@ export class BLEHandler {
   }
 
   /**
-   * 断开与指定设备的蓝牙连接
+   * 断开蓝牙连接（单设备模式）
+   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   */
+  async disconnectBLE(): Promise<[Error | null, any]>;
+  /**
+   * 断开与指定设备的蓝牙连接（多设备模式）
    * @param {string} deviceId 设备ID
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async disconnectBLE(deviceId: string) {
-    let index = this.connectedDevList.findIndex((d) => d.deviceId === deviceId);
-    if (index === -1) {
-      console.warn(`Device ${deviceId} not found in connected list`);
-      return [
-        new Error(`Device ${deviceId} not found in connected list`),
-        null,
-      ];
+  async disconnectBLE(deviceId: string): Promise<[Error | null, any]>;
+  async disconnectBLE(deviceId?: string) {
+    if (this.mode === "single") {
+      let singleDeviceId = deviceId || this.connectedSingleDev?.deviceId;
+      if (!singleDeviceId) {
+        return [new Error("单设备模式下未连接任何设备"), null];
+      }
+
+      if (this.connectedSingleDev) {
+        this.connectedDevList[0].reconnect = false; // 取消自动连接
+      }
+      // @ts-ignore
+      let [err, res] = await this.bluetoothManager.disconnect(singleDeviceId);
+      if (!err) {
+        this.connectedDevList = []; // 清空已连接设备列表
+      }
+      return [err, res];
+    } else {
+      // 多设备模式下必须提供 deviceId
+      if (!deviceId) {
+        return [new Error("多设备模式下必须提供设备ID"), null];
+      }
+
+      let index = this.connectedDevList.findIndex(
+        (d) => d.deviceId === deviceId
+      );
+      if (index === -1) {
+        return [new Error(`设备 ${deviceId} 未在已连接列表中`), null];
+      }
+
+      this.connectedDevList[index].reconnect = false; // 取消自动连接
+      let [err, res] = await this.bluetoothManager.disconnect(deviceId);
+      return [err, res];
     }
-    this.connectedDevList[index].isReConnect = false; // 取消自动连接
+  }
 
-    let [err, res] = await this.bluetoothManager.disconnect(deviceId);
-
-    // 如果是单设备模式，清空已连接设备列表
-    if (this.mode === "single" && !err) {
-      this.connectedDevList = [];
+  /**
+   * 获取蓝牙设备信号强度（单设备模式）
+   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   */
+  async getBLEDeviceRSSI(): Promise<[Error | null, any]>;
+  /**
+   * 获取蓝牙设备信号强度（多设备模式）
+   * @param {string} deviceId 设备ID
+   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   */
+  async getBLEDeviceRSSI(deviceId: string): Promise<[Error | null, any]>;
+  async getBLEDeviceRSSI(deviceId?: string) {
+    if (this.mode === "single") {
+      let singleDeviceId = this.connectedSingleDev?.deviceId;
+      if (deviceId) singleDeviceId = deviceId; // 如果传入了设备ID，使用该ID
+      if (!singleDeviceId) {
+        return [new Error("单设备模式下未连接任何设备"), null];
+      }
+      return await this.bluetoothManager.getBLEDeviceRSSI(singleDeviceId);
+    } else {
+      if (!deviceId) {
+        return [new Error("多设备模式下必须提供设备ID"), null];
+      }
+      return await this.bluetoothManager.getBLEDeviceRSSI(deviceId);
     }
-
-    return [err, res];
   }
 
   /**
    * 获取蓝牙设备的所有服务
-   * @param {string} deviceId 设备ID
-   * @returns {Promise<WechatMiniprogram.BLEService[] | undefined>} 服务列表
+   * @returns {Promise<[Error | null, WechatMiniprogram.BLEService[] | undefined]>} 错误对象和服务列表
    */
-  async getBLEServices(deviceId: string) {
-    let [err, res] = await this.bluetoothManager.getServices(deviceId);
-    return [err, res];
-  }
-
-  /**
-   * 获取蓝牙设备某个服务的所有特征值
-   * @param {string} deviceId 设备ID
-   * @returns {Promise<WechatMiniprogram.BLECharacteristic[] | undefined>} 特征值列表
-   */
-  async getCharacteristics(deviceId: string, serviceId?: string) {
-    let [err, res] = await this.bluetoothManager.getCharacteristics(
-      deviceId,
-      serviceId
-    );
-    return [err, res];
+  async getBLEServices(deviceId?: string) {
+    if (this.mode === "single") {
+      let singleDeviceId = this.connectedSingleDev?.deviceId;
+      if (deviceId) singleDeviceId = deviceId; // 如果传入了设备ID，使用该ID
+      if (!singleDeviceId) {
+        return [new Error("单设备模式下未连接任何设备"), null];
+      }
+      let [err, res] = await this.bluetoothManager.getServices(singleDeviceId);
+      return [err, res];
+    } else {
+      if (!deviceId) {
+        return [new Error("多设备模式下必须提供设备ID"), null];
+      }
+      let [err, res] = await this.bluetoothManager.getServices(deviceId);
+      return [err, res];
+    }
   }
 
   /**
@@ -354,6 +560,7 @@ export class BLEHandler {
       deviceId,
       serviceId
     );
+    console.log("checkCharacteristics", res);
 
     // 存储缺失的特征值ID
     const missingCharacteristics: string[] = [];
@@ -402,13 +609,27 @@ export class BLEHandler {
     serviceId?: string,
     characteristicId?: string
   ) {
-    let [err, res] =
-      await this.bluetoothManager.notifyCharacteristicValueChange(
+    if (this.mode === "single") {
+      let singleDeviceId = this.connectedSingleDev?.deviceId;
+      if (deviceId) singleDeviceId = deviceId; // 如果传入了设备ID，使用该ID
+      if (!singleDeviceId) {
+        return [new Error("单设备模式下未连接任何设备"), null];
+      }
+      return await this.bluetoothManager.notifyCharacteristicValueChange(
+        singleDeviceId,
+        serviceId,
+        characteristicId
+      );
+    } else {
+      if (!deviceId) {
+        return [new Error("多设备模式下必须提供设备ID"), null];
+      }
+      return await this.bluetoothManager.notifyCharacteristicValueChange(
         deviceId,
         serviceId,
         characteristicId
       );
-    return [err, res];
+    }
   }
 
   /**
@@ -428,12 +649,35 @@ export class BLEHandler {
     wx.onBLECharacteristicValueChange((res) => {
       // 将 ArrayBuffer 转换为 Uint8Array，方便处理二进制数据
       const buffer = new Uint8Array(res.value);
-      console.log("Characteristic value changed:", {
+
+      let newRes = {
         deviceId: res.deviceId,
         serviceId: res.serviceId,
         characteristicId: res.characteristicId,
         value: Array.from(buffer), // 转换为普通数组以便打印
-      });
+      };
+      // console.log("Characteristic value changed:", newRes);
+
+      // 如果有等待处理的请求
+      if (this.pendingRequests.size > 0) {
+        // 获取 Map 中第一个请求的 key 和 resolve 函数
+        const nextEntry = this.pendingRequests.entries().next();
+
+        // 判断迭代器是否还有值
+        if (!nextEntry.done) {
+          // 如果有值，才进行解构
+          const [requestId, resolveCallback] = nextEntry.value;
+
+          if (resolveCallback) {
+            // 调用回调来解析对应的 Promise
+            resolveCallback([null, newRes]);
+            // 注意：resolveCallback 内部已经包含了从 Map 中删除的逻辑，所以这里不需要再删
+          }
+        } else {
+          // Map 为空时的处理
+          console.log("当前没有待处理的请求了哟~");
+        }
+      }
 
       if (callback) {
         callback(res);
@@ -451,33 +695,104 @@ export class BLEHandler {
   }
 
   /**
-   * 发送Modbus协议数据帧
-   * @param {string} deviceId 设备ID
-   * @param {ArrayBuffer} frame 数据帧
-   * @returns {Promise<boolean>} 是否发送成功
-   * @example
-   * let data = [0x01,0x06,0x02,0x04,0x0B,0xB8,0xF1,0xCE]
-   * let arrayBuffer = new Uint8Array(data).buffer
+   * 发送数据帧
+   * @param options 发送选项
+   * @param options.frame 数据帧
+   * @param options.deviceId 设备ID (多设备模式下必需)
+   * @returns Promise with error and result
    */
-  async sentFrame(deviceId: string, frame: ArrayBuffer) {
-    let [err, res] = await this.bluetoothManager.writeCharacteristicValue(
-      deviceId,
-      frame
-    );  
-    return [err, res];
+  async sentFrame({
+    frame,
+    deviceId,
+    hasResponse,
+    timeoutMs,
+  }: {
+    frame: ArrayBuffer;
+    deviceId?: string;
+    hasResponse?: boolean;
+    timeoutMs?: number;
+  }): Promise<[Error | null, any]> {
+    let targetDeviceId: string | undefined;
+
+    if (this.mode === "single") {
+      // 单设备模式下，优先使用传入的 deviceId，否则使用已连接的设备ID
+      targetDeviceId = deviceId || this.connectedSingleDev?.deviceId;
+      if (!targetDeviceId) {
+        return [new Error("单设备模式下未连接任何设备，也未提供设备ID"), null];
+      }
+    } else {
+      // 多设备模式下，必须提供 deviceId
+      if (!deviceId) {
+        return [new Error("多设备模式下必须提供设备ID"), null];
+      }
+      targetDeviceId = deviceId;
+    }
+
+    if (hasResponse) {
+      console.log("hasResponse");
+
+      // 生成一个唯一的请求ID
+      const requestId = `req_${this.requestCounter++}`;
+
+      return new Promise<[Error | null, any]>(async (resolve) => {
+        let timeoutId: any;
+
+        const cleanupAndResolve = (result: [Error | null, any]) => {
+          if (timeoutId) clearTimeout(timeoutId);
+          // 从 Map 中删除此请求
+          this.pendingRequests.delete(requestId);
+          resolve(result);
+        };
+
+        // 将 resolve 函数存入 Map
+        this.pendingRequests.set(requestId, cleanupAndResolve);
+
+        timeoutId = setTimeout(() => {
+          // 超时后，也需要调用 cleanupAndResolve 来确保从 Map 中删除
+          cleanupAndResolve([
+            new Error(`响应超时 (${timeoutMs}ms) for request ${requestId}`),
+            null,
+          ]);
+        }, timeoutMs || 1000);
+
+        try {
+          const [err] = await this.bluetoothManager.writeCharacteristicValue(
+            targetDeviceId,
+            frame
+          );
+          if (err) {
+            cleanupAndResolve([err, null]);
+          }
+        } catch (error) {
+          cleanupAndResolve([error as Error, null]);
+        }
+      });
+    } else {
+      return await this.bluetoothManager.writeCharacteristicValue(
+        targetDeviceId,
+        frame
+      );
+    }
   }
 
   async release(callback?: () => void) {
-    // 断开所有连接的设备
-    for (let dev of this.connectedDevList) {
-      let [disErr, disRes] = await this.disconnectBLE(dev.deviceId);
-      // 如果断开连接失败，返回错误
-      if (disErr || !disRes) {
-        console.error(`Failed to disconnect device ${dev.deviceId}:`, disErr);
+    if (this.connectedDevList.length !== 0) {
+      // 断开所有连接的设备
+      for (let dev of this.connectedDevList) {
+        if (dev?.deviceId) {
+          let [disErr, disRes] = await this.disconnectBLE(dev.deviceId);
+          // 如果断开连接失败，返回错误
+          if (disErr || !disRes) {
+            console.error(
+              `Failed to disconnect device ${dev.deviceId}:`,
+              disErr
+            );
+          }
+        }
       }
     }
-    wx.offBLEConnectionStateChange();
-    wx.offBLECharacteristicValueChange();
+    await wx.offBLECharacteristicValueChange();
+    await wx.offBLEConnectionStateChange();
     await this.closeBLEAdapter();
     if (callback) callback();
   }
@@ -491,15 +806,16 @@ export class BLEHandler {
     // callback?: (devices: { deviceId: string; connected: boolean }) => void
   ) {
     // 蓝牙适配器初始化
-    await this.openBLEAdapter();
+    let [err, res] = await this.openBLEAdapter();
+    if (err && !res) return err;
     this.onBLEConnectionStateChange();
+    this.onBLECharacteristicValueChange();
 
     if (bleFoundCallback) {
       // 搜索蓝牙设备
       await this.startSearchBLE();
       // 获取设备ID
       await this.onBluetoothFound(bleFoundCallback);
-
       // this.onBLEConnectionStateChange();
     }
 

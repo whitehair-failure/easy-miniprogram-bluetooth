@@ -11,6 +11,7 @@ interface BLEHandlerConstructor {
     config: BLEHandlerConfig;
     filterKey?: string[];
     isReConnect?: boolean;
+    maxRetries?: number;
     reconnectDelay?: number;
     mode?: "single" | "multiple";
 }
@@ -33,12 +34,13 @@ export declare class BLEHandler {
     private readonly bluetoothManager;
     readonly filterKey?: string[];
     readonly isReConnect: boolean;
+    readonly maxRetries: number;
     readonly reconnectDelay: number;
     foundDevList: Device[];
     historyDevList: Device[];
     connectedDevList: Device[];
     readonly config: BLEHandlerConfig;
-    get connectedDev(): Device | undefined;
+    get connectedSingleDev(): Device | undefined;
     /**
      * 初始化蓝牙工具类实例
      * @param {BLEHandlerConstructor} options 配置选项
@@ -50,10 +52,21 @@ export declare class BLEHandler {
      */
     constructor(options: BLEHandlerConstructor);
     /**
+     * 超时控制 Promise
+     * @param promise 原始 Promise
+     * @param timeout 超时时间（默认 6000ms）
+     */
+    private withTimeout;
+    /**
+     * 检查蓝牙开启状态和权限授予状态
+     * @returns {Promise<boolean>} 是否成功打开适配器
+     */
+    checkBLEAdapter(): Promise<any>;
+    /**
      * 初始化并打开蓝牙适配器
      * @returns {Promise<boolean>} 是否成功打开适配器
      */
-    openBLEAdapter(): Promise<boolean>;
+    openBLEAdapter(): Promise<any[]>;
     /**
      * 开始搜索蓝牙设备
      * @returns {Promise<[Error | null, any]>} 错误对象和结果
@@ -76,6 +89,12 @@ export declare class BLEHandler {
      */
     connectBLE(dev: Device): Promise<(object | null)[]>;
     /**
+     * 处理设备重连
+     * @param device 需要重连的设备
+     * @returns Promise<boolean> 重连是否成功
+     */
+    private handleDeviceReconnect;
+    /**
      * 蓝牙适配器连接状态监听
      * @param {ConnectionStateCallbacks} [callbacks] 设备状态变化时的回调函数
      */
@@ -87,17 +106,21 @@ export declare class BLEHandler {
      */
     disconnectBLE(deviceId: string): Promise<(object | null)[]>;
     /**
-     * 获取蓝牙设备的所有服务
-     * @param {string} deviceId 设备ID
-     * @returns {Promise<WechatMiniprogram.BLEService[] | undefined>} 服务列表
+     * 获取蓝牙设备信号强度（单设备模式）
+     * @returns {Promise<[Error | null, any]>} 错误对象和结果
      */
-    getBLEServices(deviceId: string): Promise<(Error | WechatMiniprogram.GetBLEDeviceServicesSuccessCallbackResult | null)[]>;
+    getBLEDeviceRSSI(): Promise<[Error | null, any]>;
     /**
-     * 获取蓝牙设备某个服务的所有特征值
+     * 获取蓝牙设备信号强度（多设备模式）
      * @param {string} deviceId 设备ID
-     * @returns {Promise<WechatMiniprogram.BLECharacteristic[] | undefined>} 特征值列表
+     * @returns {Promise<[Error | null, any]>} 错误对象和结果
      */
-    getCharacteristics(deviceId: string, serviceId?: string): Promise<(Error | WechatMiniprogram.GetBLEDeviceCharacteristicsSuccessCallbackResult | null)[]>;
+    getBLEDeviceRSSI(deviceId: string): Promise<[Error | null, any]>;
+    /**
+     * 获取蓝牙设备的所有服务
+     * @returns {Promise<[Error | null, WechatMiniprogram.BLEService[] | undefined]>} 错误对象和服务列表
+     */
+    getBLEServices(deviceId?: string): Promise<(Error | null)[] | [Error | null, WechatMiniprogram.GetBLEDeviceServicesSuccessCallbackResult | null]>;
     /**
      * 检查蓝牙设备的服务是否拥有已设置的特征值
      * @param {string} deviceId 设备ID
@@ -109,7 +132,7 @@ export declare class BLEHandler {
      * @param {string} deviceId 设备ID
      * @returns {Promise<[Error | null, any]>} 错误对象和结果
      */
-    notifyBLECharacteristicValueChange(deviceId: string, serviceId?: string, characteristicId?: string): Promise<(object | null)[]>;
+    notifyBLECharacteristicValueChange(deviceId: string, serviceId?: string, characteristicId?: string): Promise<[Error | null, object | null] | (Error | null)[]>;
     /**
      * 监听蓝牙设备特征值变化
      * @param {function} callback 特征值变化时的回调函数
@@ -126,20 +149,23 @@ export declare class BLEHandler {
      */
     closeBLEAdapter(): Promise<(Error | WechatMiniprogram.BluetoothError | null)[]>;
     /**
-     * 发送Modbus协议数据帧
-     * @param {string} deviceId 设备ID
-     * @param {ArrayBuffer} frame 数据帧
-     * @returns {Promise<boolean>} 是否发送成功
-     * @example
-     * let data = [0x01,0x06,0x02,0x04,0x0B,0xB8,0xF1,0xCE]
-     * let arrayBuffer = new Uint8Array(data).buffer
+     * 发送数据帧（单设备模式）
+     * @param frame 数据帧
+     * @returns Promise with error and result
      */
-    sentMoubusFrame(deviceId: string, frame: ArrayBuffer): Promise<(object | null)[]>;
+    sentFrame(frame: ArrayBuffer): Promise<[Error | null, any]>;
+    /**
+     * 发送数据帧（多设备模式）
+     * @param deviceId 设备ID
+     * @param frame 数据帧
+     * @returns Promise with error and result
+     */
+    sentFrame(deviceId: string, frame: ArrayBuffer): Promise<[Error | null, any]>;
     release(callback?: () => void): Promise<void>;
     /**
      * 初始化蓝牙功能
      * @param {function} [bleFoundCallback] 发现设备时的回调函数
      */
-    init(bleFoundCallback?: (devices: Device[]) => void): Promise<void>;
+    init(bleFoundCallback?: (devices: Device[]) => void): Promise<any>;
 }
 export {};

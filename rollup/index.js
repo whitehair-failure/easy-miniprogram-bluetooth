@@ -153,6 +153,33 @@ var BluetoothManager = /** @class */ (function () {
         });
     };
     /**
+   * 获取蓝牙设备信号强度
+   * @param {string} deviceId 要获取信号强度的设备ID
+   */
+    BluetoothManager.prototype.getBLEDeviceRSSI = function (deviceId) {
+        return __awaiter(this, void 0, void 0, function () {
+            var res, err_1;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 2, , 3]);
+                        return [4 /*yield*/, this.promisify(wx.getBLEDeviceRSSI, {
+                                deviceId: deviceId,
+                            })];
+                    case 1:
+                        res = _a.sent();
+                        console.log("\u2714 \u83B7\u53D6\u4FE1\u53F7\u5F3A\u5EA6\u6210\u529F!");
+                        return [2 /*return*/, [null, res]];
+                    case 2:
+                        err_1 = _a.sent();
+                        console.log("\u2718 \u83B7\u53D6\u4FE1\u53F7\u5F3A\u5EA6\u5931\u8D25\uFF01".concat(err_1));
+                        return [2 /*return*/, [new Error(errToString(err_1)), null]];
+                    case 3: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
      * 初始化并打开蓝牙适配器
      * 如果蓝牙未开启或未授权，会显示对应的提示框
      * @returns {Promise<[Error | null, object | null]>} 返回错误对象和结果
@@ -161,8 +188,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.openAdapter = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var res, err_1;
-            var _this = this;
+            var res, err_2;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -178,33 +204,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u9002\u914D\u5668\u521D\u59CB\u5316\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_1 = _a.sent();
-                        setTimeout(function () {
-                            if (err_1.errno === 103) {
-                                wx.showModal({
-                                    title: "请检查是否已授权小程序蓝牙权限",
-                                    showCancel: false,
-                                    success: function (res) {
-                                        if (res.confirm) {
-                                            _this.openAdapter();
-                                        }
-                                    },
-                                });
-                            }
-                            if (err_1.errno === 1500102) {
-                                wx.showModal({
-                                    title: "请检查蓝牙是否开启",
-                                    showCancel: false,
-                                    success: function (res) {
-                                        if (res.confirm) {
-                                            _this.openAdapter();
-                                        }
-                                    },
-                                });
-                            }
-                        }, 1000);
-                        console.log("\u2718 \u521D\u59CB\u5316\u5931\u8D25\uFF01".concat(errToString(err_1)));
-                        return [2 /*return*/, [new Error(errToString(err_1)), null]];
+                        err_2 = _a.sent();
+                        console.log("\u2718 \u521D\u59CB\u5316\u5931\u8D25\uFF01".concat(errToString(err_2)));
+                        return [2 /*return*/, [err_2, null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -218,7 +220,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.startSearch = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var res, err_2;
+            var res, err_3;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -235,9 +237,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u641C\u7D22\u6210\u529F!");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_2 = _a.sent();
-                        console.log("\u2718 \u641C\u7D22\u84DD\u7259\u8BBE\u5907\u5931\u8D25\uFF01".concat(err_2));
-                        return [2 /*return*/, [new Error(errToString(err_2)), null]];
+                        err_3 = _a.sent();
+                        console.log("\u2718 \u641C\u7D22\u84DD\u7259\u8BBE\u5907\u5931\u8D25\uFF01".concat(err_3));
+                        return [2 /*return*/, [new Error(errToString(err_3)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -263,7 +265,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.stopSearch = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var res, err_3;
+            var res, err_4;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -277,9 +279,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u505C\u6B62\u67E5\u627E\u8BBE\u5907\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_3 = _a.sent();
-                        console.log("\u2718 \u505C\u6B62\u67E5\u8BE2\u8BBE\u5907\u5931\u8D25\uFF01".concat(err_3));
-                        return [2 /*return*/, [new Error(errToString(err_3)), null]];
+                        err_4 = _a.sent();
+                        console.log("\u2718 \u505C\u6B62\u67E5\u8BE2\u8BBE\u5907\u5931\u8D25\uFF01".concat(err_4));
+                        return [2 /*return*/, [new Error(errToString(err_4)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -295,7 +297,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.connect = function (deviceId) {
         return __awaiter(this, void 0, void 0, function () {
-            var res, err_4;
+            var res, err_5;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -320,9 +322,9 @@ var BluetoothManager = /** @class */ (function () {
                         });
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_4 = _a.sent();
-                        console.log("\u2718 \u8FDE\u63A5\u84DD\u7259\u5931\u8D25\uFF01".concat(errToString(err_4)));
-                        return [2 /*return*/, [new Error(errToString(err_4)), null]];
+                        err_5 = _a.sent();
+                        console.log("\u2718 \u8FDE\u63A5\u84DD\u7259\u5931\u8D25\uFF01".concat(errToString(err_5)));
+                        return [2 /*return*/, [new Error(errToString(err_5)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -337,7 +339,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.disconnect = function (deviceId) {
         return __awaiter(this, void 0, void 0, function () {
-            var res, err_5;
+            var res, err_6;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -353,9 +355,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u65AD\u5F00\u84DD\u7259\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_5 = _a.sent();
-                        console.log("\u2718 \u65AD\u5F00\u84DD\u7259\u8FDE\u63A5\u5931\u8D25\uFF01".concat(errToString(err_5)));
-                        return [2 /*return*/, [new Error(errToString(err_5)), null]];
+                        err_6 = _a.sent();
+                        console.log("\u2718 \u65AD\u5F00\u84DD\u7259\u8FDE\u63A5\u5931\u8D25\uFF01".concat(errToString(err_6)));
+                        return [2 /*return*/, [new Error(errToString(err_6)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -369,7 +371,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.closeAdapter = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var res, err_6;
+            var res, err_7;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -383,9 +385,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u91CA\u653E\u9002\u914D\u5668\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_6 = _a.sent();
-                        console.log("\u2718 \u91CA\u653E\u9002\u914D\u5668\u5931\u8D25\uFF01".concat(errToString(err_6)));
-                        return [2 /*return*/, [new Error(errToString(err_6)), null]];
+                        err_7 = _a.sent();
+                        console.log("\u2718 \u91CA\u653E\u9002\u914D\u5668\u5931\u8D25\uFF01".concat(errToString(err_7)));
+                        return [2 /*return*/, [new Error(errToString(err_7)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -428,7 +430,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.getServices = function (deviceId) {
         return __awaiter(this, void 0, void 0, function () {
-            var res, err_7;
+            var res, err_8;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -444,9 +446,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u83B7\u53D6service\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_7 = _a.sent();
-                        console.log("\u2718 \u83B7\u53D6service\u5931\u8D25\uFF01".concat(errToString(err_7)));
-                        return [2 /*return*/, [new Error(errToString(err_7)), null]];
+                        err_8 = _a.sent();
+                        console.log("\u2718 \u83B7\u53D6service\u5931\u8D25\uFF01".concat(errToString(err_8)));
+                        return [2 /*return*/, [new Error(errToString(err_8)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -462,7 +464,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.getCharacteristics = function (deviceId_1) {
         return __awaiter(this, arguments, void 0, function (deviceId, serviceId) {
-            var res, err_8;
+            var res, err_9;
             if (serviceId === void 0) { serviceId = this.serviceUId; }
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -480,9 +482,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u83B7\u53D6\u7279\u5F81\u503C\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_8 = _a.sent();
-                        console.log("\u2718 \u83B7\u53D6\u7279\u5F81\u503C\u5931\u8D25\uFF01".concat(errToString(err_8)));
-                        return [2 /*return*/, [new Error(errToString(err_8)), null]];
+                        err_9 = _a.sent();
+                        console.log("\u2718 \u83B7\u53D6\u7279\u5F81\u503C\u5931\u8D25\uFF01".concat(errToString(err_9)));
+                        return [2 /*return*/, [new Error(errToString(err_9)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -499,7 +501,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.notifyCharacteristicValueChange = function (deviceId_1) {
         return __awaiter(this, arguments, void 0, function (deviceId, serviceId, characteristicId) {
-            var res, err_9;
+            var res, err_10;
             if (serviceId === void 0) { serviceId = this.serviceUId; }
             if (characteristicId === void 0) { characteristicId = this.notifyCharacteristicId; }
             return __generator(this, function (_a) {
@@ -517,12 +519,12 @@ var BluetoothManager = /** @class */ (function () {
                             })];
                     case 2:
                         res = _a.sent();
-                        console.log("\u2714 \u8BA2\u9605notify\u6210\u529F\uFF01");
+                        console.log("\u2714 \u8BA2\u9605\u7279\u5F81\u503C\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 3:
-                        err_9 = _a.sent();
-                        console.log("\u2718 \u8BA2\u9605notify\u5931\u8D25\uFF01".concat(errToString(err_9)));
-                        return [2 /*return*/, [new Error(errToString(err_9)), null]];
+                        err_10 = _a.sent();
+                        console.log("\u2718 \u8BA2\u9605\u7279\u5F81\u503C\u5931\u8D25\uFF01".concat(errToString(err_10)));
+                        return [2 /*return*/, [new Error(errToString(err_10)), null]];
                     case 4: return [2 /*return*/];
                 }
             });
@@ -540,7 +542,7 @@ var BluetoothManager = /** @class */ (function () {
      */
     BluetoothManager.prototype.writeCharacteristicValue = function (deviceId_1, value_1) {
         return __awaiter(this, arguments, void 0, function (deviceId, value, serviceId, characteristicId) {
-            var res, err_10;
+            var res, err_11;
             if (serviceId === void 0) { serviceId = this.serviceUId; }
             if (characteristicId === void 0) { characteristicId = this.writeCharacteristicId; }
             return __generator(this, function (_a) {
@@ -558,9 +560,9 @@ var BluetoothManager = /** @class */ (function () {
                         console.log("\u2714 \u5199\u5165\u6570\u636E\u6210\u529F\uFF01");
                         return [2 /*return*/, [null, res]];
                     case 2:
-                        err_10 = _a.sent();
-                        console.log("\u2718 \u5199\u5165\u6570\u636E\u5931\u8D25\uFF01".concat(errToString(err_10)));
-                        return [2 /*return*/, [new Error(errToString(err_10)), null]];
+                        err_11 = _a.sent();
+                        console.log("\u2718 \u5199\u5165\u6570\u636E\u5931\u8D25\uFF01".concat(errToString(err_11)));
+                        return [2 /*return*/, [new Error(errToString(err_11)), null]];
                     case 3: return [2 /*return*/];
                 }
             });
@@ -589,7 +591,8 @@ var BLEHandler = /** @class */ (function () {
     function BLEHandler(options) {
         this.filterKey = []; // 过滤关键字
         this.isReConnect = false; // 设备异常断开是否自动重连
-        this.reconnectDelay = 1000; // 自动重连延时，单位毫秒
+        this.maxRetries = 1000; // 最大自动重连次数
+        this.reconnectDelay = 1000; // 每次自动重连延时时间，单位毫秒
         this.foundDevList = []; // 已找到的设备列表
         this.historyDevList = []; // 已找到的设备的历史列表
         this.connectedDevList = []; // 已连接的设备列表
@@ -602,7 +605,8 @@ var BLEHandler = /** @class */ (function () {
         this.mode = options.mode || "single"; // 默认单设备模式
         this.filterKey = options.filterKey;
         this.isReConnect = options.isReConnect || false; // 默认不自动重连
-        this.reconnectDelay = options.reconnectDelay || 1000; // 默认1秒重连
+        this.maxRetries = options.maxRetries || 3; // 默认最大重连次数为3
+        this.reconnectDelay = options.reconnectDelay || 3000; // 默认每隔3秒重连一次
         this.config = options.config;
         this.bluetoothManager = new BluetoothManager({
             writeCharacteristicId: options.config.writeCharacteristicId,
@@ -610,7 +614,7 @@ var BLEHandler = /** @class */ (function () {
             serviceUId: options.config.serviceUId,
         });
     }
-    Object.defineProperty(BLEHandler.prototype, "connectedDev", {
+    Object.defineProperty(BLEHandler.prototype, "connectedSingleDev", {
         // 当前连接的设备
         // 注意：如果是单设备模式，这个属性会被覆盖为当前连接的设备
         // 如果是多设备模式，这个属性会返回第一个设备
@@ -621,22 +625,73 @@ var BLEHandler = /** @class */ (function () {
         configurable: true
     });
     /**
+     * 超时控制 Promise
+     * @param promise 原始 Promise
+     * @param timeout 超时时间（默认 6000ms）
+     */
+    BLEHandler.prototype.withTimeout = function (promise, timeout) {
+        if (timeout === void 0) { timeout = 6000; }
+        var timeoutId;
+        var timeoutPromise = new Promise(function (_, reject) {
+            timeoutId = setTimeout(function () { return reject(new Error("Timeout")); }, timeout);
+        });
+        // 保证清理定时器
+        return Promise.race([
+            Promise.resolve(promise).finally(function () { return clearTimeout(timeoutId); }),
+            timeoutPromise,
+        ]);
+    };
+    /**
+     * 检查蓝牙开启状态和权限授予状态
+     * @returns {Promise<boolean>} 是否成功打开适配器
+     */
+    BLEHandler.prototype.checkBLEAdapter = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _a, err, res;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0: return [4 /*yield*/, this.bluetoothManager.openAdapter()];
+                    case 1:
+                        _a = _b.sent(), err = _a[0], res = _a[1];
+                        if (err != null) {
+                            // 如果打开适配器失败，提示用户检查权限或蓝牙状态
+                            if ((err === null || err === void 0 ? void 0 : err.errno) === 103) {
+                                return [2 /*return*/, {
+                                        errno: err.errno,
+                                        errMsg: "请检查是否已授权小程序蓝牙权限",
+                                    }];
+                            }
+                            if ((err === null || err === void 0 ? void 0 : err.errno) === 1500102) {
+                                return [2 /*return*/, {
+                                        errno: err.errno,
+                                        errMsg: "请检查蓝牙是否开启",
+                                    }];
+                            }
+                            return [2 /*return*/, err]; // 其他错误直接返回
+                        }
+                        // {errno:0,errMsg:"openBLuetoothAdapter:ok"}
+                        return [2 /*return*/, res];
+                }
+            });
+        });
+    };
+    /**
      * 初始化并打开蓝牙适配器
      * @returns {Promise<boolean>} 是否成功打开适配器
      */
     BLEHandler.prototype.openBLEAdapter = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, err;
+            var _a, err, res;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0: return [4 /*yield*/, this.bluetoothManager.openAdapter()];
                     case 1:
-                        _a = _b.sent(), err = _a[0], _a[1];
+                        _a = _b.sent(), err = _a[0], res = _a[1];
                         if (err != null) {
-                            console.error("openAdapter", err);
-                            return [2 /*return*/, false];
+                            console.error(err);
+                            return [2 /*return*/, [err, res]]; // 打开适配器失败
                         }
-                        return [2 /*return*/, true];
+                        return [2 /*return*/, [err, res]];
                 }
             });
         });
@@ -728,7 +783,7 @@ var BLEHandler = /** @class */ (function () {
                 switch (_d.label) {
                     case 0:
                         if (!(this.mode === "single" && this.connectedDevList.length > 0)) return [3 /*break*/, 2];
-                        return [4 /*yield*/, this.disconnectBLE(((_c = this.connectedDev) === null || _c === void 0 ? void 0 : _c.deviceId) || "")];
+                        return [4 /*yield*/, this.disconnectBLE(((_c = this.connectedSingleDev) === null || _c === void 0 ? void 0 : _c.deviceId) || "")];
                     case 1:
                         _a = _d.sent(), disErr = _a[0], disRes = _a[1];
                         // 如果断开连接失败，返回错误
@@ -758,43 +813,106 @@ var BLEHandler = /** @class */ (function () {
         });
     };
     /**
+     * 处理设备重连
+     * @param device 需要重连的设备
+     * @returns Promise<boolean> 重连是否成功
+     */
+    BLEHandler.prototype.handleDeviceReconnect = function (device) {
+        return __awaiter(this, void 0, void 0, function () {
+            var maxRetries, retryCount, _a, err, res, error_1;
+            var _this = this;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        maxRetries = this.maxRetries;
+                        retryCount = 0;
+                        _b.label = 1;
+                    case 1:
+                        if (!(retryCount < maxRetries)) return [3 /*break*/, 7];
+                        _b.label = 2;
+                    case 2:
+                        _b.trys.push([2, 5, , 6]);
+                        console.log("\u5F00\u59CB\u7B2C ".concat(retryCount + 1, " \u6B21\u91CD\u8FDE..."));
+                        // 等待重连延时
+                        return [4 /*yield*/, new Promise(function (resolve) {
+                                return setTimeout(resolve, _this.reconnectDelay);
+                            })];
+                    case 3:
+                        // 等待重连延时
+                        _b.sent();
+                        return [4 /*yield*/, this.connectBLE(device)];
+                    case 4:
+                        _a = _b.sent(), err = _a[0], res = _a[1];
+                        if (!err && res) {
+                            console.log("\u8BBE\u5907 ".concat(device.name, "(").concat(device.deviceId, ") \u91CD\u8FDE\u6210\u529F"));
+                            return [2 /*return*/, true];
+                        }
+                        retryCount++;
+                        console.log("\u7B2C ".concat(retryCount, " \u6B21\u91CD\u8FDE\u5931\u8D25"));
+                        return [3 /*break*/, 6];
+                    case 5:
+                        error_1 = _b.sent();
+                        retryCount++;
+                        console.error("\u7B2C ".concat(retryCount, " \u6B21\u91CD\u8FDE\u53D1\u751F\u9519\u8BEF:"), error_1);
+                        return [3 /*break*/, 6];
+                    case 6: return [3 /*break*/, 1];
+                    case 7:
+                        console.error("\u8BBE\u5907 ".concat(device.name, "(").concat(device.deviceId, ") \u91CD\u8FDE\u5931\u8D25,\u5DF2\u8FBE\u5230\u6700\u5927\u91CD\u8BD5\u6B21\u6570"));
+                        return [2 /*return*/, false];
+                }
+            });
+        });
+    };
+    /**
      * 蓝牙适配器连接状态监听
      * @param {ConnectionStateCallbacks} [callbacks] 设备状态变化时的回调函数
      */
     BLEHandler.prototype.onBLEConnectionStateChange = function (callbacks) {
         var _this = this;
-        wx.onBLEConnectionStateChange(function (res) {
+        wx.onBLEConnectionStateChange(function (res) { return __awaiter(_this, void 0, void 0, function () {
+            var index, device, success;
             var _a, _b, _c;
-            console.log("onBLEConnectionStateChange", res);
-            // 自动重连
-            if (!res.connected) {
-                var index = _this.connectedDevList.findIndex(function (d) { return d.deviceId === res.deviceId; });
-                if (index === -1) {
-                    console.warn("Device ".concat(res.deviceId, " not found in connected list"));
-                    return;
+            return __generator(this, function (_d) {
+                switch (_d.label) {
+                    case 0:
+                        console.log("onBLEConnectionStateChange", res);
+                        if (!!res.connected) return [3 /*break*/, 3];
+                        index = this.connectedDevList.findIndex(function (d) { return d.deviceId === res.deviceId; });
+                        if (index === -1) {
+                            console.warn("Device ".concat(res.deviceId, " not found in connected list"));
+                            return [2 /*return*/];
+                        }
+                        device = this.connectedDevList[index];
+                        if (!(device === null || device === void 0 ? void 0 : device.isReConnect)) return [3 /*break*/, 2];
+                        return [4 /*yield*/, this.handleDeviceReconnect(device)];
+                    case 1:
+                        success = _d.sent();
+                        if (!success) {
+                            // 重连失败,从已连接列表中移除
+                            this.connectedDevList.splice(index, 1);
+                            console.log("\u8BBE\u5907 ".concat(device.name, " \u5DF2\u4ECE\u5DF2\u8FDE\u63A5\u5217\u8868\u4E2D\u79FB\u9664"));
+                        }
+                        return [3 /*break*/, 3];
+                    case 2:
+                        // 不需要重连,直接移除
+                        this.connectedDevList.splice(index, 1);
+                        console.log("\u8BBE\u5907 ".concat(device.name, " \u65AD\u5F00\u8FDE\u63A5"));
+                        _d.label = 3;
+                    case 3:
+                        if (callbacks) {
+                            // 使用可选链操作符进行安全调用
+                            if (res.connected) {
+                                (_a = callbacks === null || callbacks === void 0 ? void 0 : callbacks.connected) === null || _a === void 0 ? void 0 : _a.call(callbacks, res.deviceId);
+                            }
+                            else {
+                                (_b = callbacks === null || callbacks === void 0 ? void 0 : callbacks.disconnected) === null || _b === void 0 ? void 0 : _b.call(callbacks, res.deviceId);
+                            }
+                            (_c = callbacks === null || callbacks === void 0 ? void 0 : callbacks.callback) === null || _c === void 0 ? void 0 : _c.call(callbacks, res);
+                        }
+                        return [2 /*return*/];
                 }
-                var curDev_1 = _this.connectedDevList[index];
-                // 如果是异常断开的设备，尝试重新连接
-                if (curDev_1 === null || curDev_1 === void 0 ? void 0 : curDev_1.isReConnect) {
-                    setTimeout(function () {
-                        _this.connectBLE(curDev_1);
-                    }, _this.reconnectDelay);
-                }
-                else {
-                    _this.connectedDevList.splice(index, 1);
-                }
-            }
-            if (callbacks) {
-                // 使用可选链操作符进行安全调用
-                if (res.connected) {
-                    (_a = callbacks === null || callbacks === void 0 ? void 0 : callbacks.connected) === null || _a === void 0 ? void 0 : _a.call(callbacks, res.deviceId);
-                }
-                else {
-                    (_b = callbacks === null || callbacks === void 0 ? void 0 : callbacks.disconnected) === null || _b === void 0 ? void 0 : _b.call(callbacks, res.deviceId);
-                }
-                (_c = callbacks === null || callbacks === void 0 ? void 0 : callbacks.callback) === null || _c === void 0 ? void 0 : _c.call(callbacks, res);
-            }
-        });
+            });
+        }); });
     };
     /**
      * 断开与指定设备的蓝牙连接
@@ -808,47 +926,78 @@ var BLEHandler = /** @class */ (function () {
                 switch (_b.label) {
                     case 0:
                         index = this.connectedDevList.findIndex(function (d) { return d.deviceId === deviceId; });
+                        if (index === -1) {
+                            console.warn("Device ".concat(deviceId, " not found in connected list"));
+                            return [2 /*return*/, [
+                                    new Error("Device ".concat(deviceId, " not found in connected list")),
+                                    null,
+                                ]];
+                        }
                         this.connectedDevList[index].isReConnect = false; // 取消自动连接
                         return [4 /*yield*/, this.bluetoothManager.disconnect(deviceId)];
                     case 1:
                         _a = _b.sent(), err = _a[0], res = _a[1];
+                        // 如果是单设备模式，清空已连接设备列表
+                        if (this.mode === "single" && !err) {
+                            this.connectedDevList = [];
+                        }
                         return [2 /*return*/, [err, res]];
+                }
+            });
+        });
+    };
+    BLEHandler.prototype.getBLEDeviceRSSI = function (deviceId) {
+        return __awaiter(this, void 0, void 0, function () {
+            var singleDeviceId;
+            var _a;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        if (!(this.mode === "single")) return [3 /*break*/, 2];
+                        singleDeviceId = (_a = this.connectedSingleDev) === null || _a === void 0 ? void 0 : _a.deviceId;
+                        if (deviceId)
+                            singleDeviceId = deviceId; // 如果传入了设备ID，使用该ID
+                        if (!singleDeviceId) {
+                            return [2 /*return*/, [new Error("单设备模式下未连接任何设备"), null]];
+                        }
+                        return [4 /*yield*/, this.bluetoothManager.getBLEDeviceRSSI(singleDeviceId)];
+                    case 1: return [2 /*return*/, _b.sent()];
+                    case 2:
+                        if (!deviceId) {
+                            return [2 /*return*/, [new Error("多设备模式下必须提供设备ID"), null]];
+                        }
+                        return [4 /*yield*/, this.bluetoothManager.getBLEDeviceRSSI(deviceId)];
+                    case 3: return [2 /*return*/, _b.sent()];
                 }
             });
         });
     };
     /**
      * 获取蓝牙设备的所有服务
-     * @param {string} deviceId 设备ID
-     * @returns {Promise<WechatMiniprogram.BLEService[] | undefined>} 服务列表
+     * @returns {Promise<[Error | null, WechatMiniprogram.BLEService[] | undefined]>} 错误对象和服务列表
      */
     BLEHandler.prototype.getBLEServices = function (deviceId) {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, err, res;
+            var singleDeviceId;
+            var _a;
             return __generator(this, function (_b) {
                 switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.bluetoothManager.getServices(deviceId)];
-                    case 1:
-                        _a = _b.sent(), err = _a[0], res = _a[1];
-                        return [2 /*return*/, [err, res]];
-                }
-            });
-        });
-    };
-    /**
-     * 获取蓝牙设备某个服务的所有特征值
-     * @param {string} deviceId 设备ID
-     * @returns {Promise<WechatMiniprogram.BLECharacteristic[] | undefined>} 特征值列表
-     */
-    BLEHandler.prototype.getCharacteristics = function (deviceId, serviceId) {
-        return __awaiter(this, void 0, void 0, function () {
-            var _a, err, res;
-            return __generator(this, function (_b) {
-                switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.bluetoothManager.getCharacteristics(deviceId, serviceId)];
-                    case 1:
-                        _a = _b.sent(), err = _a[0], res = _a[1];
-                        return [2 /*return*/, [err, res]];
+                    case 0:
+                        if (!(this.mode === "single")) return [3 /*break*/, 2];
+                        singleDeviceId = (_a = this.connectedSingleDev) === null || _a === void 0 ? void 0 : _a.deviceId;
+                        if (deviceId)
+                            singleDeviceId = deviceId; // 如果传入了设备ID，使用该ID
+                        if (!singleDeviceId) {
+                            return [2 /*return*/, [new Error("单设备模式下未连接任何设备"), null]];
+                        }
+                        return [4 /*yield*/, this.bluetoothManager.getServices(singleDeviceId)];
+                    case 1: return [2 /*return*/, _b.sent()];
+                    case 2:
+                        if (!deviceId) {
+                            return [2 /*return*/, [new Error("多设备模式下必须提供设备ID"), null]];
+                        }
+                        return [4 /*yield*/, this.bluetoothManager.getServices(deviceId)];
+                    case 3: return [2 /*return*/, _b.sent()];
                 }
             });
         });
@@ -898,13 +1047,26 @@ var BLEHandler = /** @class */ (function () {
      */
     BLEHandler.prototype.notifyBLECharacteristicValueChange = function (deviceId, serviceId, characteristicId) {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, err, res;
+            var singleDeviceId;
+            var _a;
             return __generator(this, function (_b) {
                 switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.bluetoothManager.notifyCharacteristicValueChange(deviceId, serviceId, characteristicId)];
-                    case 1:
-                        _a = _b.sent(), err = _a[0], res = _a[1];
-                        return [2 /*return*/, [err, res]];
+                    case 0:
+                        if (!(this.mode === "single")) return [3 /*break*/, 2];
+                        singleDeviceId = (_a = this.connectedSingleDev) === null || _a === void 0 ? void 0 : _a.deviceId;
+                        if (deviceId)
+                            singleDeviceId = deviceId; // 如果传入了设备ID，使用该ID
+                        if (!singleDeviceId) {
+                            return [2 /*return*/, [new Error("单设备模式下未连接任何设备"), null]];
+                        }
+                        return [4 /*yield*/, this.bluetoothManager.notifyCharacteristicValueChange(singleDeviceId, serviceId, characteristicId)];
+                    case 1: return [2 /*return*/, _b.sent()];
+                    case 2:
+                        if (!deviceId) {
+                            return [2 /*return*/, [new Error("多设备模式下必须提供设备ID"), null]];
+                        }
+                        return [4 /*yield*/, this.bluetoothManager.notifyCharacteristicValueChange(deviceId, serviceId, characteristicId)];
+                    case 3: return [2 /*return*/, _b.sent()];
                 }
             });
         });
@@ -922,12 +1084,13 @@ var BLEHandler = /** @class */ (function () {
         wx.onBLECharacteristicValueChange(function (res) {
             // 将 ArrayBuffer 转换为 Uint8Array，方便处理二进制数据
             var buffer = new Uint8Array(res.value);
-            console.log("Characteristic value changed:", {
+            var newRes = {
                 deviceId: res.deviceId,
                 serviceId: res.serviceId,
                 characteristicId: res.characteristicId,
                 value: Array.from(buffer), // 转换为普通数组以便打印
-            });
+            };
+            console.log("Characteristic value changed:", newRes);
             if (callback) {
                 callback(res);
             }
@@ -950,24 +1113,28 @@ var BLEHandler = /** @class */ (function () {
             });
         });
     };
-    /**
-     * 发送Modbus协议数据帧
-     * @param {string} deviceId 设备ID
-     * @param {ArrayBuffer} frame 数据帧
-     * @returns {Promise<boolean>} 是否发送成功
-     * @example
-     * let data = [0x01,0x06,0x02,0x04,0x0B,0xB8,0xF1,0xCE]
-     * let arrayBuffer = new Uint8Array(data).buffer
-     */
-    BLEHandler.prototype.sentMoubusFrame = function (deviceId, frame) {
+    BLEHandler.prototype.sentFrame = function (frameOrDeviceId, frame) {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, err, res;
+            var deviceId, frameData;
+            var _a;
             return __generator(this, function (_b) {
                 switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.bluetoothManager.writeCharacteristicValue(deviceId, frame)];
-                    case 1:
-                        _a = _b.sent(), err = _a[0], res = _a[1];
-                        return [2 /*return*/, [err, res]];
+                    case 0:
+                        if (!(this.mode === "single")) return [3 /*break*/, 2];
+                        deviceId = (_a = this.connectedSingleDev) === null || _a === void 0 ? void 0 : _a.deviceId;
+                        if (!deviceId) {
+                            return [2 /*return*/, [new Error("单设备模式下未连接任何设备"), null]];
+                        }
+                        frameData = frameOrDeviceId;
+                        return [4 /*yield*/, this.bluetoothManager.writeCharacteristicValue(deviceId, frameData)];
+                    case 1: return [2 /*return*/, _b.sent()];
+                    case 2:
+                        // 多设备模式下，需要同时提供 deviceId 和 frame
+                        if (!frame || typeof frameOrDeviceId !== "string") {
+                            return [2 /*return*/, [new Error("多设备模式下必须提供设备ID"), null]];
+                        }
+                        return [4 /*yield*/, this.bluetoothManager.writeCharacteristicValue(frameOrDeviceId, frame)];
+                    case 3: return [2 /*return*/, _b.sent()];
                 }
             });
         });
@@ -1015,27 +1182,27 @@ var BLEHandler = /** @class */ (function () {
     // callback?: (devices: { deviceId: string; connected: boolean }) => void
     ) {
         return __awaiter(this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: 
-                    // 蓝牙适配器初始化
-                    return [4 /*yield*/, this.openBLEAdapter()];
+            var _a, err, res;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0: return [4 /*yield*/, this.openBLEAdapter()];
                     case 1:
-                        // 蓝牙适配器初始化
-                        _a.sent();
+                        _a = _b.sent(), err = _a[0], res = _a[1];
+                        if (err && !res)
+                            return [2 /*return*/, err];
+                        this.onBLEConnectionStateChange();
                         if (!bleFoundCallback) return [3 /*break*/, 4];
                         // 搜索蓝牙设备
                         return [4 /*yield*/, this.startSearchBLE()];
                     case 2:
                         // 搜索蓝牙设备
-                        _a.sent();
+                        _b.sent();
                         // 获取设备ID
                         return [4 /*yield*/, this.onBluetoothFound(bleFoundCallback)];
                     case 3:
                         // 获取设备ID
-                        _a.sent();
-                        this.onBLEConnectionStateChange();
-                        _a.label = 4;
+                        _b.sent();
+                        _b.label = 4;
                     case 4: return [2 /*return*/];
                 }
             });
