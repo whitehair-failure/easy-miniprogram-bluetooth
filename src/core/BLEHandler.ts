@@ -1,41 +1,14 @@
 import BluetoothManager from "./BluetoothManager";
-/* import * as comm from "./utils/comm"
-import * as ModbusRtu from "./utils/modbus/modebusRtu" */
 
-interface Device extends WechatMiniprogram.BlueToothDevice {
-  isConnect: boolean;
-  reconnect?: boolean;
-}
-
-interface BLEHandlerConfig {
-  writeCharacteristicId?: string;
-  notifyCharacteristicId?: string;
-  serviceUId?: string;
-}
-
-interface BLEHandlerConstructor {
-  config: BLEHandlerConfig;
-  searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption;
-  filterKey?: string[];
-  reconnect?: boolean; // 设备异常断开是否自动重连
-  connectTimeout?: number; // 正常连接的超时时间，单位毫秒
-  maxRetries?: number; // 最大自动重连次数
-  reconnectDelay?: number; // 每次自动重连间隔时间，单位毫秒
-  mode?: "single" | "multiple";
-}
-interface ConnectionStateCallbacks {
-  callback?: (
-    devices: WechatMiniprogram.OnBLEConnectionStateChangeListenerResult
-  ) => void;
-  connected?: (deviceId: string) => void;
-  disconnected?: (deviceId: string) => void;
-}
-
-// 首先添加一个类型定义来描述检查结果
-interface CharacteristicCheckResult {
-  success: boolean;
-  missingCharacteristics?: string[];
-}
+import type {
+  Device,
+  BLEHandlerConfig,
+  BLEHandlerConstructor,
+  ConnectionStateCallbacks,
+  CharacteristicCheckResult,
+  writeCharacteristicOption,
+  readCharacteristicOption,
+} from "../types/ble";
 /**
  * 蓝牙工具类
  * 封装小程序蓝牙流程方法
@@ -43,7 +16,7 @@ interface CharacteristicCheckResult {
  */
 export class BLEHandler {
   private readonly mode: "single" | "multiple";
-  private readonly bluetoothManager: BluetoothManager;
+  private readonly bluetoothManager: any;
 
   private processingConnections: Set<string> = new Set(); // 新增此行
   // 将 sendResolve 从单个函数改为一个 Map
@@ -56,7 +29,8 @@ export class BLEHandler {
   public readonly connectTimeout?: number; // 蓝牙连接超时时间
   public readonly maxRetries: number = 3; // 最大自动重连次数
   public readonly reconnectDelay: number = 3000; // 每次自动重连间隔时间，单位毫秒
-  public readonly searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = {}; // 搜索配置
+  public readonly searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption =
+    {}; // 搜索配置
 
   public foundDevList: Device[] = []; // 当前已找到的设备列表
   public historyDevList: Device[] = []; // 已找到的设备的历史列表
@@ -101,11 +75,9 @@ export class BLEHandler {
     this.searchOption = options.searchOption || {};
     this.config = options.config;
 
-    this.bluetoothManager = new BluetoothManager({
-      writeCharacteristicId: options.config.writeCharacteristicId,
-      notifyCharacteristicId: options.config.notifyCharacteristicId,
-      serviceUId: options.config.serviceUId,
-    });
+    // BluetoothManager is a module of utility functions — don't construct it.
+    // We'll pass needed service/characteristic ids explicitly from this.config
+    this.bluetoothManager = BluetoothManager;
   }
 
   /**
@@ -128,11 +100,58 @@ export class BLEHandler {
   }
 
   /**
+   * 运行时更新 BLEHandler 的配置，并同步到内部 BluetoothManager
+   * 接受部分配置项：serviceUId / writeCharacteristicId / notifyCharacteristicId
+   * 返回 [Error|null, updatedConfig]
+   */
+  setBLEHandlerConfig(
+    cfg: Partial<BLEHandlerConfig>
+  ): [Error | null, BLEHandlerConfig] {
+    if (!cfg || typeof cfg !== "object") {
+      return [new Error("Invalid config object"), this.config];
+    }
+
+    // 验证传入的字段类型
+    const allowedKeys: Array<keyof BLEHandlerConfig> = [
+      "serviceUId",
+      "writeCharacteristicId",
+      "notifyCharacteristicId",
+    ];
+
+    for (const key of Object.keys(cfg) as Array<string>) {
+      if (!allowedKeys.includes(key as any)) {
+        return [new Error(`Unknown config key: ${key}`), this.config];
+      }
+      const val = (cfg as any)[key];
+      if (val != null && typeof val !== "string") {
+        return [
+          new Error(`Invalid type for ${key}, expected string`),
+          this.config,
+        ];
+      }
+    }
+
+    // 合并到本地配置（修改已有对象的字段，避免给 readonly 引用重新赋值）
+    if (cfg.serviceUId) this.config.serviceUId = cfg.serviceUId;
+    if (cfg.writeCharacteristicId)
+      this.config.writeCharacteristicId = cfg.writeCharacteristicId;
+    if (cfg.notifyCharacteristicId)
+      this.config.notifyCharacteristicId = cfg.notifyCharacteristicId;
+
+    // 不再同步到 BluetoothManager（现在 BluetoothManager 不保留默认 UUID）
+    // 如需重新订阅通知，可调用 notifyBLECharacteristicValueChange
+    this.notifyBLECharacteristicValueChange(
+      this.connectedSingleDev?.deviceId || ""
+    );
+    return [null, this.config];
+  }
+
+  /**
    * 检查蓝牙开启状态和权限授予状态
    * @returns {Promise<boolean>} 是否成功打开适配器
    */
   async checkBLEAdapter() {
-    let [err, res] = await this.bluetoothManager.openAdapter();
+    let [err, res] = await this.bluetoothManager.openBluetoothAdapter();
 
     if (err != null) {
       // 如果打开适配器失败，提示用户检查权限或蓝牙状态
@@ -159,7 +178,7 @@ export class BLEHandler {
    * @returns {Promise<boolean>} 是否成功打开适配器
    */
   async openBLEAdapter() {
-    let [err, res] = await this.bluetoothManager.openAdapter();
+    let [err, res] = await this.bluetoothManager.openBluetoothAdapter();
 
     if (err != null) {
       console.error(err);
@@ -172,8 +191,13 @@ export class BLEHandler {
    * 开始搜索蓝牙设备
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async startSearchBLE() {
-    let [err, res] = await this.bluetoothManager.startSearch(this.searchOption);
+  async startSearchBLE(
+    searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this
+      .searchOption
+  ) {
+    let [err, res] = await this.bluetoothManager.startBluetoothDevicesDiscovery(
+      searchOption
+    );
     return [err, res];
   }
 
@@ -243,7 +267,8 @@ export class BLEHandler {
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
   async stopSearchBLE() {
-    let [err, res] = await this.bluetoothManager.stopSearch();
+    let [err, res] =
+      await this.bluetoothManager.stopBluetoothDevicesDiscovery();
 
     if (!err) {
       this.foundDevList = [];
@@ -281,7 +306,14 @@ export class BLEHandler {
 
     try {
       // 连接设备
-      let [err, res] = await this.withTimeout(this.bluetoothManager.connect(dev.deviceId, this.connectTimeout), this.connectTimeout);
+      const connResult = (await this.withTimeout(
+        this.bluetoothManager.createBLEConnection(
+          dev.deviceId,
+          this.connectTimeout
+        ),
+        this.connectTimeout
+      )) as [any, any];
+      let [err, res] = connResult;
 
       if (res || err.errCode == -1) {
         dev.isConnect = true; // 更新设备状态为已连接
@@ -477,7 +509,9 @@ export class BLEHandler {
         this.connectedDevList[0].reconnect = false; // 取消自动连接
       }
       // @ts-ignore
-      let [err, res] = await this.bluetoothManager.disconnect(singleDeviceId);
+      let [err, res] = await this.bluetoothManager.closeBLEConnection(
+        singleDeviceId
+      );
       if (!err) {
         this.connectedDevList = []; // 清空已连接设备列表
       }
@@ -496,7 +530,7 @@ export class BLEHandler {
       }
 
       this.connectedDevList[index].reconnect = false; // 取消自动连接
-      let [err, res] = await this.bluetoothManager.disconnect(deviceId);
+      let [err, res] = await this.bluetoothManager.closeBLEConnection(deviceId);
       return [err, res];
     }
   }
@@ -539,13 +573,17 @@ export class BLEHandler {
       if (!singleDeviceId) {
         return [new Error("单设备模式下未连接任何设备"), null];
       }
-      let [err, res] = await this.bluetoothManager.getServices(singleDeviceId);
+      let [err, res] = await this.bluetoothManager.getBLEDeviceServices(
+        singleDeviceId
+      );
       return [err, res];
     } else {
       if (!deviceId) {
         return [new Error("多设备模式下必须提供设备ID"), null];
       }
-      let [err, res] = await this.bluetoothManager.getServices(deviceId);
+      let [err, res] = await this.bluetoothManager.getBLEDeviceServices(
+        deviceId
+      );
       return [err, res];
     }
   }
@@ -556,9 +594,9 @@ export class BLEHandler {
    * @returns {Promise<WechatMiniprogram.BLECharacteristic[] | undefined>} 特征值列表
    */
   async checkCharacteristics(deviceId: string, serviceId?: string) {
-    let [err, res] = await this.bluetoothManager.getCharacteristics(
+    let [err, res] = await this.bluetoothManager.getBLEDeviceCharacteristics(
       deviceId,
-      serviceId
+      serviceId || this.config.serviceUId
     );
     console.log("checkCharacteristics", res);
 
@@ -569,7 +607,7 @@ export class BLEHandler {
     if (
       !this.config.writeCharacteristicId ||
       !res?.characteristics.some(
-        (c) => c.uuid === this.config.writeCharacteristicId
+        (c: any) => c.uuid === this.config.writeCharacteristicId
       )
     ) {
       missingCharacteristics.push("writeCharacteristicId");
@@ -579,7 +617,7 @@ export class BLEHandler {
     if (
       !this.config.notifyCharacteristicId ||
       !res?.characteristics.some(
-        (c) => c.uuid === this.config.notifyCharacteristicId
+        (c: any) => c.uuid === this.config.notifyCharacteristicId
       )
     ) {
       missingCharacteristics.push("notifyCharacteristicId");
@@ -615,19 +653,19 @@ export class BLEHandler {
       if (!singleDeviceId) {
         return [new Error("单设备模式下未连接任何设备"), null];
       }
-      return await this.bluetoothManager.notifyCharacteristicValueChange(
+      return await this.bluetoothManager.notifyBLECharacteristicValueChange(
         singleDeviceId,
-        serviceId,
-        characteristicId
+        serviceId || this.config.serviceUId,
+        characteristicId || this.config.notifyCharacteristicId
       );
     } else {
       if (!deviceId) {
         return [new Error("多设备模式下必须提供设备ID"), null];
       }
-      return await this.bluetoothManager.notifyCharacteristicValueChange(
+      return await this.bluetoothManager.notifyBLECharacteristicValueChange(
         deviceId,
-        serviceId,
-        characteristicId
+        serviceId || this.config.serviceUId,
+        characteristicId || this.config.notifyCharacteristicId
       );
     }
   }
@@ -647,6 +685,8 @@ export class BLEHandler {
     ) => void
   ): void {
     wx.onBLECharacteristicValueChange((res) => {
+      console.log('onBLECharacteristicValueChange event received:', res);
+      
       // 将 ArrayBuffer 转换为 Uint8Array，方便处理二进制数据
       const buffer = new Uint8Array(res.value);
 
@@ -686,47 +726,41 @@ export class BLEHandler {
   }
 
   /**
-   * 关闭蓝牙适配器
-   * @returns {Promise<[Error | null, any]>} 错误对象和结果
-   */
-  async closeBLEAdapter() {
-    let [err, res] = await this.bluetoothManager.closeAdapter();
-    return [err, res];
-  }
-
-  /**
-   * 发送数据帧
-   * @param options 发送选项
-   * @param options.frame 数据帧
-   * @param options.deviceId 设备ID (多设备模式下必需)
+   * 发送数据帧（使用 writeCharacteristic 类型）
+   * @param options 写入选项，包含小程序原生字段以及额外的 hasResponse/timeoutMs
    * @returns Promise with error and result
    */
-  async sentFrame({
-    frame,
-    deviceId,
-    hasResponse,
-    timeoutMs,
-  }: {
-    frame: ArrayBuffer;
-    deviceId?: string;
-    hasResponse?: boolean;
-    timeoutMs?: number;
-  }): Promise<[Error | null, any]> {
+  async writeCharacteristic(
+    options: writeCharacteristicOption
+  ): Promise<[Error | null, any]> {
+    const {
+      value: frame,
+      deviceId: optDeviceId,
+      hasResponse,
+      timeoutMs,
+      serviceId,
+      characteristicId,
+    } = options;
+
     let targetDeviceId: string | undefined;
 
     if (this.mode === "single") {
       // 单设备模式下，优先使用传入的 deviceId，否则使用已连接的设备ID
-      targetDeviceId = deviceId || this.connectedSingleDev?.deviceId;
+      targetDeviceId = optDeviceId || this.connectedSingleDev?.deviceId;
       if (!targetDeviceId) {
         return [new Error("单设备模式下未连接任何设备，也未提供设备ID"), null];
       }
     } else {
       // 多设备模式下，必须提供 deviceId
-      if (!deviceId) {
+      if (!optDeviceId) {
         return [new Error("多设备模式下必须提供设备ID"), null];
       }
-      targetDeviceId = deviceId;
+      targetDeviceId = optDeviceId;
     }
+
+    const serviceIdFinal = serviceId || this.config.serviceUId;
+    const characteristicIdFinal =
+      characteristicId || this.config.writeCharacteristicId;
 
     if (hasResponse) {
       console.log("hasResponse");
@@ -756,9 +790,13 @@ export class BLEHandler {
         }, timeoutMs || 1000);
 
         try {
-          const [err] = await this.bluetoothManager.writeCharacteristicValue(
-            targetDeviceId,
-            frame
+          const [err] = await this.bluetoothManager.writeBLECharacteristicValue(
+            {
+              deviceId: targetDeviceId,
+              value: frame,
+              serviceId: serviceIdFinal,
+              characteristicId: characteristicIdFinal,
+            }
           );
           if (err) {
             cleanupAndResolve([err, null]);
@@ -768,11 +806,96 @@ export class BLEHandler {
         }
       });
     } else {
-      return await this.bluetoothManager.writeCharacteristicValue(
-        targetDeviceId,
-        frame
-      );
+      return await this.bluetoothManager.writeBLECharacteristicValue({
+        deviceId: targetDeviceId,
+        value: frame,
+        serviceId: serviceIdFinal,
+        characteristicId: characteristicIdFinal,
+      });
     }
+  }
+
+  /**
+   * 读取数据帧（使用 readCharacteristic 类型）
+   * @param options 写入选项，包含小程序原生字段以及额外的 timeoutMs
+   * @returns Promise with error and result
+   */
+  async readCharacteristic(
+    options: readCharacteristicOption
+  ): Promise<[Error | null, any]> {
+    const {
+      deviceId: optDeviceId,
+      timeoutMs,
+      serviceId,
+      characteristicId,
+    } = options;
+
+    let targetDeviceId: string | undefined;
+
+    if (this.mode === "single") {
+      // 单设备模式下，优先使用传入的 deviceId，否则使用已连接的设备ID
+      targetDeviceId = optDeviceId || this.connectedSingleDev?.deviceId;
+      if (!targetDeviceId) {
+        return [new Error("单设备模式下未连接任何设备，也未提供设备ID"), null];
+      }
+    } else {
+      // 多设备模式下，必须提供 deviceId
+      if (!optDeviceId) {
+        return [new Error("多设备模式下必须提供设备ID"), null];
+      }
+      targetDeviceId = optDeviceId;
+    }
+
+    const serviceIdFinal = serviceId || this.config.serviceUId;
+    const characteristicIdFinal =
+      characteristicId || this.config.writeCharacteristicId;
+
+    // 生成一个唯一的请求ID
+    const requestId = `req_${this.requestCounter++}`;
+
+    return new Promise<[Error | null, any]>(async (resolve) => {
+      let timeoutId: any;
+
+      const cleanupAndResolve = (result: [Error | null, any]) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        // 从 Map 中删除此请求
+        this.pendingRequests.delete(requestId);
+        resolve(result);
+      };
+
+      // 将 resolve 函数存入 Map
+      this.pendingRequests.set(requestId, cleanupAndResolve);
+
+      timeoutId = setTimeout(() => {
+        // 超时后，也需要调用 cleanupAndResolve 来确保从 Map 中删除
+        cleanupAndResolve([
+          new Error(`响应超时 (${timeoutMs}ms) for request ${requestId}`),
+          null,
+        ]);
+      }, timeoutMs || 1000);
+
+      try {
+        const [err] = await this.bluetoothManager.readBLECharacteristicValue({
+          deviceId: targetDeviceId,
+          serviceId: serviceIdFinal,
+          characteristicId: characteristicIdFinal,
+        });
+        if (err) {
+          cleanupAndResolve([err, null]);
+        }
+      } catch (error) {
+        cleanupAndResolve([error as Error, null]);
+      }
+    });
+  }
+
+  /**
+   * 关闭蓝牙适配器
+   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   */
+  async closeBLEAdapter() {
+    let [err, res] = await this.bluetoothManager.closeBluetoothAdapter();
+    return [err, res];
   }
 
   async release(callback?: () => void) {

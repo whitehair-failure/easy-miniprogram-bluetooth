@@ -1,0 +1,49 @@
+// Shared BLE-related type declarations used across the project
+
+export interface Device extends WechatMiniprogram.BlueToothDevice {
+  isConnect: boolean;
+  reconnect?: boolean;
+}
+
+export interface BLEHandlerConfig {
+  writeCharacteristicId?: string;
+  notifyCharacteristicId?: string;
+  serviceUId?: string;
+}
+
+export interface BLEHandlerConstructor {
+  config: BLEHandlerConfig;
+  searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption;
+  filterKey?: string[];
+  reconnect?: boolean; // 设备异常断开是否自动重连
+  connectTimeout?: number; // 正常连接的超时时间，单位毫秒
+  maxRetries?: number; // 最大自动重连次数
+  reconnectDelay?: number; // 每次自动重连间隔时间，单位毫秒
+  mode?: "single" | "multiple";
+}
+
+export interface ConnectionStateCallbacks {
+  callback?: (
+    devices: WechatMiniprogram.OnBLEConnectionStateChangeListenerResult
+  ) => void;
+  connected?: (deviceId: string) => void;
+  disconnected?: (deviceId: string) => void;
+}
+
+export interface CharacteristicCheckResult {
+  success: boolean;
+  missingCharacteristics?: string[];
+}
+
+// writeCharacteristic 包含原生 WriteBLECharacteristicValueOption 并扩展额外字段
+export interface writeCharacteristicOption
+  extends WechatMiniprogram.WriteBLECharacteristicValueOption {
+  hasResponse?: boolean;
+  timeoutMs?: number;
+}
+
+// writeCharacteristic 包含原生 WriteBLECharacteristicValueOption 并扩展额外字段
+export interface readCharacteristicOption
+  extends WechatMiniprogram.ReadBLECharacteristicValueOption {
+  timeoutMs?: number;
+}
