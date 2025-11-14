@@ -6,6 +6,7 @@ export interface Device extends WechatMiniprogram.BlueToothDevice {
 }
 
 export interface BLEHandlerConfig {
+  readCharacteristicId?: string;
   writeCharacteristicId?: string;
   notifyCharacteristicId?: string;
   serviceUId?: string;

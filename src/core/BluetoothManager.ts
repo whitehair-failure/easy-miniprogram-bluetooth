@@ -1,26 +1,5 @@
 import errToString from "../utils/error";
 
-interface Device extends WechatMiniprogram.BlueToothDevice {
-  isConnect: boolean;
-}
-
-interface BluetoothManagerConfig {
-  serviceUId?: string;
-  writeCharacteristicId?: string;
-  notifyCharacteristicId?: string;
-}
-
-interface WxApiCallback {
-  success?: (res: WechatMiniprogram.GeneralCallbackResult) => void;
-  fail?: (err: WechatMiniprogram.GeneralCallbackResult) => void;
-  complete?: () => void;
-  [key: string]: any;
-}
-// 首先添加一个类型定义来描述检查结果
-interface CharacteristicCheckResult {
-  success: boolean;
-  missingCharacteristics?: string[];
-}
 /**
  * 蓝牙管理器类
  * 封装微信小程序蓝牙API，提供更简单的调用方式

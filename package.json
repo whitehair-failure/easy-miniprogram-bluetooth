@@ -1,4 +1,41 @@
 {
+  "name": "miniprogram-bluetooth-utils",
+  "version": "0.1.0",
+  "description": "微信小程序低功耗蓝牙（BLE）工具封装",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "ARCHITECTURE.md",
+    "EXAMPLES.md"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "clean": "npx rimraf dist rollup",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "miniprogram",
+    "wechat",
+    "bluetooth",
+    "BLE",
+    "小程序",
+    "蓝牙",
+    "低功耗蓝牙"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whitehair-failure/miniprogram-bluetooth-utils"
+  },
+  "bugs": {
+    "url": "https://github.com/whitehair-failure/miniprogram-bluetooth-utils/issues"
+  },
+  "homepage": "https://github.com/whitehair-failure/miniprogram-bluetooth-utils#readme",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-node-resolve": "^16.0.1",
