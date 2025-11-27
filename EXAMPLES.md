@@ -35,8 +35,8 @@ Page({
   },
 
   async initBluetooth() {
-    // 检查蓝牙状态
-    const checkResult = await this.bleHandler.checkBLEAdapter();
+  // 检查蓝牙状态
+  const checkResult = await this.bleHandler.getAdapterStatus();
     if (checkResult.errno) {
       wx.showToast({
         title: checkResult.errMsg,
@@ -51,8 +51,8 @@ Page({
       this.setData({ deviceList: devices });
     });
 
-    // 监听连接状态变化
-    this.bleHandler.onBLEConnectionStateChange({
+  // 监听连接状态变化
+  this.bleHandler.onConnectionStateChange({
       connected: (deviceId) => {
         console.log('设备已连接:', deviceId);
         this.setData({ connected: true });
@@ -66,7 +66,8 @@ Page({
     });
 
     // 监听数据接收
-    this.bleHandler.onBLECharacteristicValueChange((result) => {
+    // addCharacteristicValueChangeListener 会返回一个用于取消订阅的函数
+    const unsubscribe = this.bleHandler.addCharacteristicValueChangeListener((result) => {
       const data = new Uint8Array(result.value);
       console.log('收到数据:', Array.from(data));
       // 处理接收到的数据...
@@ -78,8 +79,8 @@ Page({
     const index = e.currentTarget.dataset.index;
     const device = this.data.deviceList[index];
 
-    wx.showLoading({ title: '连接中...' });
-    const [err, res] = await this.bleHandler.connectBLE(device);
+  wx.showLoading({ title: '连接中...' });
+  const [err, res] = await this.bleHandler.connectDevice(device);
     wx.hideLoading();
 
     if (err) {
@@ -101,7 +102,7 @@ Page({
     dataView.setUint8(2, 0x03);
     dataView.setUint8(3, 0x04);
 
-    const [err, res] = await this.bleHandler.writeCharacteristic({
+    const [err, res] = await this.bleHandler.writeCharacteristicValue({
       value: buffer,
       hasResponse: true, // 等待设备响应
       timeoutMs: 3000,
@@ -118,7 +119,7 @@ Page({
 
   // 断开连接
   async disconnect() {
-    const [err, res] = await this.bleHandler.disconnectBLE();
+    const [err, res] = await this.bleHandler.disconnectDevice();
     if (err) {
       console.error('断开失败:', err);
     }
@@ -167,7 +168,7 @@ Page({
       this.setData({ deviceList: devices });
     });
 
-    this.bleHandler.onBLEConnectionStateChange({
+    this.bleHandler.onConnectionStateChange({
       connected: (deviceId) => {
         this.updateConnectedList();
       },
@@ -179,7 +180,7 @@ Page({
 
   updateConnectedList() {
     this.setData({
-      connectedDevices: this.bleHandler.connectedDevList,
+      connectedDevices: this.bleHandler.connectedDevices,
     });
   },
 
@@ -188,7 +189,7 @@ Page({
     const index = e.currentTarget.dataset.index;
     const device = this.data.deviceList[index];
 
-    const [err, res] = await this.bleHandler.connectBLE(device);
+    const [err, res] = await this.bleHandler.connectDevice(device);
     if (!err) {
       this.updateConnectedList();
     }
@@ -196,7 +197,7 @@ Page({
 
   // 向指定设备发送数据
   async sendToDevice(deviceId, data) {
-    const [err, res] = await this.bleHandler.writeCharacteristic({
+    const [err, res] = await this.bleHandler.writeCharacteristicValue({
       deviceId: deviceId, // 指定设备ID
       value: data,
       hasResponse: true,
@@ -209,7 +210,7 @@ Page({
   // 断开指定设备
   async disconnectDevice(e) {
     const deviceId = e.currentTarget.dataset.deviceId;
-    await this.bleHandler.disconnectBLE(deviceId);
+  await this.bleHandler.disconnectDevice(deviceId);
     this.updateConnectedList();
   },
 
@@ -244,7 +245,7 @@ Page({
 
   // 运行时切换到不同的服务和特征值
   async switchToNewService() {
-    const [err, newConfig] = this.bleHandler.setBLEHandlerConfig({
+    const [err, newConfig] = this.bleHandler.updateBLEHandlerConfig({
       serviceUId: 'AAA0',
       writeCharacteristicId: 'AAA1',
       notifyCharacteristicId: 'AAA2',
@@ -279,7 +280,7 @@ Page({
   // 定期检查信号强度
   async monitorRSSI() {
     setInterval(async () => {
-      const [err, res] = await this.bleHandler.getBLEDeviceRSSI();
+      const [err, res] = await this.bleHandler.getDeviceRSSI();
       if (!err && res) {
         console.log('当前信号强度:', res.RSSI);
         // 根据信号强度做出相应处理...
@@ -316,7 +317,7 @@ Page({
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       console.log(`连接尝试 ${attempt}/${maxAttempts}`);
 
-      const [err, res] = await this.bleHandler.connectBLE(device);
+  const [err, res] = await this.bleHandler.connectDevice(device);
 
       if (!err) {
         console.log('连接成功');
@@ -336,7 +337,7 @@ Page({
 
   async sendDataWithErrorHandling(data) {
     try {
-      const [err, res] = await this.bleHandler.writeCharacteristic({
+      const [err, res] = await this.bleHandler.writeCharacteristicValue({
         value: data,
         hasResponse: true,
         timeoutMs: 3000,
@@ -403,7 +404,7 @@ Page({
 
     console.log('发送帧:', bufferToHex(buffer));
 
-    const [err, res] = await this.bleHandler.writeCharacteristic({
+    const [err, res] = await this.bleHandler.writeCharacteristicValue({
       value: buffer,
       hasResponse: true,
       timeoutMs: 3000,
@@ -412,6 +413,7 @@ Page({
     return [err, res];
   },
 
+  // 如果使用自定义页面方法处理通知，可使用 addCharacteristicValueChangeListener 注册
   onBLECharacteristicValueChange(result) {
     const buffer = new Uint8Array(result.value);
     console.log('收到帧:', bufferToHex(result.value));
@@ -463,16 +465,16 @@ Page({
 ## 常见问题
 
 ### Q: 连接后无法写入数据？
-A: 确保已调用 `notifyBLECharacteristicValueChange` 订阅特征值通知，这通常在连接成功后自动完成。
+A: 确保已调用 `enableCharacteristicNotification` 订阅特征值通知，这通常在连接成功后自动完成。
 
 ### Q: 如何判断是否已连接？
-A: 检查 `bleHandler.connectedDevList` 或使用 `bleHandler.connectedSingleDev`（单设备模式）。
+A: 检查 `bleHandler.connectedDevices` 或使用 `bleHandler.singleConnectedDevice`（单设备模式）。
 
 ### Q: 自动重连不生效？
-A: 确保在初始化时设置了 `reconnect: true`，并且设备是异常断开（非主动调用 `disconnectBLE`）。
+A: 确保在初始化时设置了 `reconnect: true`，并且设备是异常断开（非主动调用 `disconnectDevice`）。
 
 ### Q: 如何处理大数据传输？
 A: 微信小程序单次写入数据有大小限制（通常 20 字节），需要分包发送。建议实现分包逻辑或使用 MTU 协商。
 
 ### Q: 多设备模式下如何区分数据来源？
-A: `onBLECharacteristicValueChange` 回调的 `result` 参数包含 `deviceId` 字段，可以据此区分。
+A: `addCharacteristicValueChangeListener` 回调的 `result` 参数包含 `deviceId` 字段，可以据此区分。

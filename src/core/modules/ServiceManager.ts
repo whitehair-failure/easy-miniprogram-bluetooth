@@ -70,7 +70,7 @@ export class ServiceManager {
    * 获取蓝牙设备的所有服务
    * @returns {Promise<[Error | null, WechatMiniprogram.BLEService[] | undefined]>} 错误对象和服务列表
    */
-  async getBLEServices(deviceId: string) {
+  async getDeviceServices(deviceId: string) {
     let [err, res] = await BluetoothManager.getBLEDeviceServices(deviceId);
     return [err, res];
   }
@@ -81,7 +81,7 @@ export class ServiceManager {
    * @param {string} [serviceId] 服务ID（可选，默认使用config中的serviceUId）
    * @returns {Promise<[Error | null, CharacteristicCheckResult]>} 特征值检查结果
    */
-  async checkCharacteristics(
+  async validateCharacteristics(
     deviceId: string,
     serviceId?: string
   ): Promise<[Error | null, CharacteristicCheckResult]> {
@@ -132,6 +132,8 @@ export class ServiceManager {
     return [null, result];
   }
 
+  // Note: old name `checkCharacteristics` removed. Use `validateCharacteristics`.
+
   /**
    * 启用蓝牙设备特征值变化的通知功能
    * @param {string} deviceId 设备ID
@@ -139,7 +141,7 @@ export class ServiceManager {
    * @param {string} [characteristicId] 特征值ID
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async notifyBLECharacteristicValueChange(
+  async enableCharacteristicNotification(
     deviceId: string,
     serviceId?: string,
     characteristicId?: string
@@ -153,4 +155,6 @@ export class ServiceManager {
       characteristicId || this.config.notifyCharacteristicId || ""
     );
   }
+
+  // Note: old name `notifyBLECharacteristicValueChange` removed. Use `enableCharacteristicNotification`.
 }

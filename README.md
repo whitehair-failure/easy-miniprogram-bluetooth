@@ -47,17 +47,17 @@ const bleHandler = new BLEHandler({
   }
 });
 
-// 初始化并搜索设备
+  // 初始化并搜索设备
 await bleHandler.init((devices) => {
   console.log('发现设备:', devices);
   // 选择第一个设备并连接
   if (devices.length > 0) {
-    bleHandler.connectBLE(devices[0]);
+    bleHandler.connectDevice(devices[0]);
   }
 });
 
 // 连接状态监听
-bleHandler.onBLEConnectionStateChange({
+bleHandler.onConnectionStateChange({
   connected: (deviceId) => {
     console.log('设备已连接:', deviceId);
   },
@@ -66,21 +66,23 @@ bleHandler.onBLEConnectionStateChange({
   }
 });
 
-// 监听特征值变化
-bleHandler.onBLECharacteristicValueChange((result) => {
+// 监听特征值变化（推荐）
+const unsubscribe = bleHandler.addCharacteristicValueChangeListener((result) => {
   console.log('收到数据:', result.value);
 });
+// 取消订阅：
+// unsubscribe();
 
 // 写入数据
 const buffer = new ArrayBuffer(8);
-const [writeErr, writeRes] = await bleHandler.writeCharacteristic({
+const [writeErr, writeRes] = await bleHandler.writeCharacteristicValue({
   value: buffer,
   hasResponse: true, // 等待设备响应
   timeoutMs: 2000, // 超时时间
 });
 
 // 读取数据
-const [readErr, readRes] = await bleHandler.readCharacteristic({
+const [readErr, readRes] = await bleHandler.readCharacteristicValue({
   timeoutMs: 2000,
 });
 ```
@@ -95,17 +97,17 @@ const bleHandler = new BLEHandler({
 });
 
 // 连接多个设备
-await bleHandler.connectBLE(device1);
-await bleHandler.connectBLE(device2);
+await bleHandler.connectDevice(device1);
+await bleHandler.connectDevice(device2);
 
 // 向指定设备写入数据
-await bleHandler.writeCharacteristic({
+await bleHandler.writeCharacteristicValue({
   deviceId: device1.deviceId,
   value: buffer,
 });
 
 // 断开指定设备
-await bleHandler.disconnectBLE(device1.deviceId);
+await bleHandler.disconnectDevice(device1.deviceId);
 ```
 
 ## 项目结构
@@ -161,35 +163,35 @@ new BLEHandler(options: BLEHandlerConstructor)
 - `connectTimeout`: `number` - 连接超时毫秒数（可选）
 - `searchOption`: `StartBluetoothDevicesDiscoveryOption` - 搜索配置（可选）
 
-### 主要方法
+### 主要方法（已更新命名）
 
 #### 初始化与搜索
 - `init(callback?)` - 初始化蓝牙并可选搜索设备
-- `openBLEAdapter()` - 打开蓝牙适配器
-- `checkBLEAdapter()` - 检查蓝牙状态和权限
-- `startSearchBLE(options?)` - 开始搜索设备
-- `stopSearchBLE()` - 停止搜索设备
-- `onBluetoothFound(callback)` - 监听发现新设备
+- `openAdapter()` - 打开蓝牙适配器
+- `getAdapterStatus()` - 检查蓝牙状态和权限
+- `startDeviceDiscovery(options?)` - 开始搜索设备
+- `stopDeviceDiscovery()` - 停止搜索设备
+- `onDeviceFound(callback)` - 监听发现新设备
 
 #### 连接管理
-- `connectBLE(device)` - 连接指定设备
-- `disconnectBLE(deviceId?)` - 断开设备连接
-- `onBLEConnectionStateChange(callbacks)` - 监听连接状态变化
+- `connectDevice(device)` - 连接指定设备
+- `disconnectDevice(deviceId?)` - 断开设备连接
+- `onConnectionStateChange(callbacks)` - 监听连接状态变化
 
 #### 服务与特征值
-- `getBLEServices(deviceId?)` - 获取设备的所有服务
-- `checkCharacteristics(deviceId, serviceId?)` - 检查特征值是否存在
-- `notifyBLECharacteristicValueChange(deviceId, serviceId?, characteristicId?)` - 订阅特征值通知
-- `setBLEHandlerConfig(config)` - 运行时更新配置
+- `getDeviceServices(deviceId?)` - 获取设备的所有服务
+- `validateCharacteristics(deviceId, serviceId?)` - 检查特征值是否存在
+- `enableCharacteristicNotification(deviceId, serviceId?, characteristicId?)` - 订阅特征值通知
+- `updateBLEHandlerConfig(config)` - 运行时更新配置
 
 #### 数据读写
-- `writeCharacteristic(options)` - 写入数据
-- `readCharacteristic(options)` - 读取数据
-- `onBLECharacteristicValueChange(callback)` - 监听特征值变化
+- `writeCharacteristicValue(options)` - 写入数据
+- `readCharacteristicValue(options)` - 读取数据
+- `addCharacteristicValueChangeListener(callback)` - 监听特征值变化（返回取消订阅函数）
 
 #### 其他
-- `getBLEDeviceRSSI(deviceId?)` - 获取设备信号强度
-- `closeBLEAdapter()` - 关闭蓝牙适配器
+- `getDeviceRSSI(deviceId?)` - 获取设备信号强度
+- `closeAdapter()` - 关闭蓝牙适配器
 - `release(callback?)` - 释放所有资源
 
 ### 返回值格式
@@ -197,7 +199,7 @@ new BLEHandler(options: BLEHandlerConstructor)
 所有异步方法均返回 `Promise<[Error | null, any]>` 格式：
 
 ```typescript
-const [err, res] = await bleHandler.connectBLE(device);
+const [err, res] = await bleHandler.connectDevice(device);
 if (err) {
   console.error('连接失败:', err);
 } else {

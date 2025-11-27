@@ -27,7 +27,7 @@ export class DiscoveryManager {
    * 开始搜索蓝牙设备
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async startSearchBLE(
+  async startDeviceDiscovery(
     searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this
       .searchOption
   ) {
@@ -41,7 +41,7 @@ export class DiscoveryManager {
    * 监听发现新蓝牙设备事件
    * @param {function} [callback] 发现实时设备时的回调函数
    */
-  onBluetoothFound(callback?: (devices: Device[]) => void) {
+  onDeviceFound(callback?: (devices: Device[]) => void) {
     wx.onBluetoothDeviceFound((res) => {
       console.log("res.devices", res.devices);
 
@@ -99,7 +99,8 @@ export class DiscoveryManager {
    * 停止搜索蓝牙设备
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async stopSearchBLE() {
+  // 新名：stopDeviceDiscovery
+  async stopDeviceDiscovery() {
     let [err, res] = await BluetoothManager.stopBluetoothDevicesDiscovery();
 
     if (!err) {

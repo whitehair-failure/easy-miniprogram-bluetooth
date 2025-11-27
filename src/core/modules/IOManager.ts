@@ -19,9 +19,9 @@ export class IOManager {
   private characteristicValueChangeCallbacks: Set<
     (result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult) => void
   > = new Set();
-  
-  // 标记是否已经注册了微信的全局监听器
-  private isWxListenerRegistered = false;
+
+  // 标记是否已经注册了平台的全局监听器（私有实现）
+  private isCharacteristicListenerRegistered = false;
 
   private readonly config: BLEHandlerConfig;
 
@@ -32,8 +32,8 @@ export class IOManager {
   /**
    * 注册微信的全局特征值变化监听器（只注册一次）
    */
-  private ensureWxListenerRegistered(): void {
-    if (this.isWxListenerRegistered) {
+  private ensureCharacteristicListenerRegistered(): void {
+    if (this.isCharacteristicListenerRegistered) {
       return;
     }
 
@@ -80,37 +80,42 @@ export class IOManager {
       });
     });
 
-    this.isWxListenerRegistered = true;
+    this.isCharacteristicListenerRegistered = true;
   }
+
+  // 兼容旧名：ensureWxListenerRegistered -> ensureCharacteristicListenerRegistered
+  // Removed deprecated ensureWxListenerRegistered alias; use ensureCharacteristicListenerRegistered
 
   /**
    * 添加蓝牙设备特征值变化的监听回调
    * @param {function} callback 特征值变化时的回调函数
    * @returns {function} 返回一个用于取消该回调的函数
    */
-  addCharacteristicValueChangeCallback(
+  addCharacteristicValueChangeListener(
     callback: (
       result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult
     ) => void
   ): () => void {
-    // 确保微信的全局监听器已注册
-    this.ensureWxListenerRegistered();
+    // 确保平台的全局监听器已注册
+    this.ensureCharacteristicListenerRegistered();
 
     // 添加回调到集合中
     this.characteristicValueChangeCallbacks.add(callback);
 
     // 返回一个解绑函数
     return () => {
-      this.delCharacteristicValueChangeCallback(callback);
+      this.removeCharacteristicValueChangeListener(callback);
     };
   }
+
+  // Removed deprecated addCharacteristicValueChangeCallback alias; use addCharacteristicValueChangeListener
 
   /**
    * 删除特定的特征值变化监听回调
    * @param {function} callback 要删除的回调函数
    * @returns {boolean} 是否成功删除
    */
-  delCharacteristicValueChangeCallback(
+  removeCharacteristicValueChangeListener(
     callback: (
       result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult
     ) => void
@@ -118,12 +123,16 @@ export class IOManager {
     return this.characteristicValueChangeCallbacks.delete(callback);
   }
 
+  // Removed deprecated delCharacteristicValueChangeCallback alias; use removeCharacteristicValueChangeListener
+
   /**
    * 删除所有特征值变化监听回调
    */
-  delAllCharacteristicValueChangeCallback(): void {
+  removeAllCharacteristicValueChangeListeners(): void {
     this.characteristicValueChangeCallbacks.clear();
   }
+
+  // Removed deprecated delAllCharacteristicValueChangeCallback alias; use removeAllCharacteristicValueChangeListeners
 
   /**
    * 发送数据帧（使用 writeCharacteristic 类型）
@@ -132,7 +141,7 @@ export class IOManager {
    * @param connectedSingleDeviceId 单设备模式下的默认设备ID
    * @returns Promise with error and result
    */
-  async writeCharacteristic(
+  async writeCharacteristicValue(
     options: writeCharacteristicOption,
     mode: "single" | "multiple",
     connectedSingleDeviceId?: string
@@ -166,7 +175,7 @@ export class IOManager {
     const characteristicIdFinal =
       characteristicId || this.config.writeCharacteristicId || "";
 
-    if (hasResponse) {
+  if (hasResponse) {
       console.log("hasResponse");
 
       // 生成一个唯一的请求ID
@@ -219,6 +228,8 @@ export class IOManager {
     }
   }
 
+  // Removed deprecated writeCharacteristic alias; use writeCharacteristicValue
+
   /**
    * 读取数据帧（使用 readCharacteristic 类型）
    * @param options 读取选项，包含小程序原生字段以及额外的 timeoutMs
@@ -226,7 +237,7 @@ export class IOManager {
    * @param connectedSingleDeviceId 单设备模式下的默认设备ID
    * @returns Promise with error and result
    */
-  async readCharacteristic(
+  async readCharacteristicValue(
     options: readCharacteristicOption,
     mode: "single" | "multiple",
     connectedSingleDeviceId?: string
@@ -296,4 +307,6 @@ export class IOManager {
       }
     });
   }
+
+  // Removed deprecated readCharacteristic alias; use readCharacteristicValue
 }

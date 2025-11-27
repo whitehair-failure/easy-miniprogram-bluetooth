@@ -28,7 +28,7 @@ export class AdapterManager {
    * 检查蓝牙开启状态和权限授予状态
    * @returns {Promise<any>} 检查结果
    */
-  async checkBLEAdapter() {
+  async getAdapterStatus() {
     let [err, res] = await BluetoothManager.openBluetoothAdapter();
 
     if (err != null) {
@@ -55,7 +55,7 @@ export class AdapterManager {
    * 初始化并打开蓝牙适配器
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async openBLEAdapter() {
+  async openAdapter() {
     let [err, res] = await BluetoothManager.openBluetoothAdapter();
 
     if (err != null) {
@@ -69,7 +69,7 @@ export class AdapterManager {
    * 关闭蓝牙适配器
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async closeBLEAdapter() {
+  async closeAdapter() {
     let [err, res] = await BluetoothManager.closeBluetoothAdapter();
     return [err, res];
   }
@@ -79,7 +79,7 @@ export class AdapterManager {
    * @param {string} deviceId 设备ID
    * @returns {Promise<[Error | null, any]>} 错误对象和结果
    */
-  async getBLEDeviceRSSI(deviceId: string): Promise<[Error | null, any]> {
+  async getDeviceRSSI(deviceId: string): Promise<[Error | null, any]> {
     return await BluetoothManager.getBLEDeviceRSSI(deviceId);
   }
 }

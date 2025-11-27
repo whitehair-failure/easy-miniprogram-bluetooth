@@ -63,7 +63,7 @@ src/
 - 设备连接、断开操作
 - 自动重连逻辑和策略
 - 连接状态监听和管理
-- 维护已连接设备列表（connectedDevList, historyConnectedDevList）
+- 维护已连接设备列表（connectedDevices, historyConnectedDevices）
 - 单设备/多设备模式的连接控制
 
 **优势：**
@@ -85,8 +85,8 @@ src/
 
 ### 5. IOManager（输入输出管理器）
 **职责：**
-- 数据写入（writeCharacteristic）
-- 数据读取（readCharacteristic）
+- 数据写入（writeCharacteristicValue）
+- 数据读取（readCharacteristicValue）
 - 请求队列管理（pendingRequests Map）
 - 特征值变化监听和分发
 - 超时和响应匹配机制
