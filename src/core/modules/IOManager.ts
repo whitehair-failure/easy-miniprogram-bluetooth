@@ -2,17 +2,22 @@
  * IOManager - 输入输出管理模块
  * 负责读写操作、请求队列管理、特征值变化监听
  */
-import BluetoothManager from "../BluetoothManager";
 import type {
   writeCharacteristicOption,
   readCharacteristicOption,
   BLEHandlerConfig,
 } from "../../types/ble";
+import { BLEIOError, BLETimeoutError, BLEConfigError, convertWxErrorToBLEError } from "../../utils/error";
 
 export class IOManager {
-  // 将 sendResolve 从单个函数改为一个 Map
-  private pendingRequests: Map<string, (result: [Error | null, any]) => void> =
-    new Map();
+  // 请求队列：存储待响应的请求信息，用于精确匹配
+  private pendingRequests: Map<string, {
+    deviceId: string;
+    characteristicId: string;
+    resolve: (result: any) => void;
+    reject: (error: Error) => void;
+    timeoutId: any;
+  }> = new Map();
   private requestCounter = 0; // 用于生成唯一的请求ID
 
   // 存储多个特征值变化的回调函数
@@ -49,24 +54,34 @@ export class IOManager {
       };
       console.log("onBLECharacteristicValueChange event received:", newRes);
 
-      // 如果有等待处理的请求
+      // 精确匹配：根据 deviceId 和 characteristicId 找到对应的请求
       if (this.pendingRequests.size > 0) {
-        // 获取 Map 中第一个请求的 key 和 resolve 函数
-        const nextEntry = this.pendingRequests.entries().next();
+        let matchedRequestId: string | null = null;
+        
+        // 遍历所有待处理的请求，找到第一个匹配的（ES5 兼容方式）
+        this.pendingRequests.forEach((request, requestId) => {
+          if (!matchedRequestId && 
+              request.deviceId === res.deviceId && 
+              request.characteristicId === res.characteristicId) {
+            matchedRequestId = requestId;
+          }
+        });
 
-        // 判断迭代器是否还有值
-        if (!nextEntry.done) {
-          // 如果有值，才进行解构
-          const [requestId, resolveCallback] = nextEntry.value;
-
-          if (resolveCallback) {
-            // 调用回调来解析对应的 Promise
-            resolveCallback([null, newRes]);
-            // 注意：resolveCallback 内部已经包含了从 Map 中删除的逻辑，所以这里不需要再删
+        if (matchedRequestId) {
+          const request = this.pendingRequests.get(matchedRequestId);
+          if (request) {
+            // 清理超时定时器
+            if (request.timeoutId) {
+              clearTimeout(request.timeoutId);
+            }
+            // 解析 Promise
+            request.resolve(newRes);
+            // 从队列中删除
+            this.pendingRequests.delete(matchedRequestId);
+            console.log(`请求 ${matchedRequestId} 已匹配并完成`);
           }
         } else {
-          // Map 为空时的处理
-          console.log("当前没有待处理的请求了哟~");
+          console.log(`未找到匹配的请求: deviceId=${res.deviceId}, characteristicId=${res.characteristicId}`);
         }
       }
 
@@ -139,13 +154,16 @@ export class IOManager {
    * @param options 写入选项，包含小程序原生字段以及额外的 hasResponse/timeoutMs
    * @param mode 单设备/多设备模式
    * @param connectedSingleDeviceId 单设备模式下的默认设备ID
-   * @returns Promise with error and result
+   * @returns Promise with result
+   * @throws {BLEIOError} 写入失败时抛出
+   * @throws {BLETimeoutError} 超时时抛出
+   * @throws {BLEConfigError} 配置错误时抛出
    */
   async writeCharacteristicValue(
     options: writeCharacteristicOption,
     mode: "single" | "multiple",
     connectedSingleDeviceId?: string
-  ): Promise<[Error | null, any]> {
+  ): Promise<any> {
     const {
       value: frame,
       deviceId: optDeviceId,
@@ -161,12 +179,12 @@ export class IOManager {
       // 单设备模式下，优先使用传入的 deviceId，否则使用已连接的设备ID
       targetDeviceId = optDeviceId || connectedSingleDeviceId;
       if (!targetDeviceId) {
-        return [new Error("单设备模式下未连接任何设备，也未提供设备ID"), null];
+        throw new BLEConfigError("单设备模式下未连接任何设备，也未提供设备ID");
       }
     } else {
       // 多设备模式下，必须提供 deviceId
       if (!optDeviceId) {
-        return [new Error("多设备模式下必须提供设备ID"), null];
+        throw new BLEConfigError("多设备模式下必须提供设备ID");
       }
       targetDeviceId = optDeviceId;
     }
@@ -181,50 +199,69 @@ export class IOManager {
       // 生成一个唯一的请求ID
       const requestId = `req_${this.requestCounter++}`;
 
-      return new Promise<[Error | null, any]>(async (resolve) => {
-        let timeoutId: any;
-
-        const cleanupAndResolve = (result: [Error | null, any]) => {
-          if (timeoutId) clearTimeout(timeoutId);
-          // 从 Map 中删除此请求
+      return new Promise<any>(async (resolve, reject) => {
+        const cleanup = () => {
+          const request = this.pendingRequests.get(requestId);
+          if (request?.timeoutId) {
+            clearTimeout(request.timeoutId);
+          }
           this.pendingRequests.delete(requestId);
-          resolve(result);
         };
 
-        // 将 resolve 函数存入 Map
-        this.pendingRequests.set(requestId, cleanupAndResolve);
-
-        timeoutId = setTimeout(() => {
-          // 超时后，也需要调用 cleanupAndResolve 来确保从 Map 中删除
-          cleanupAndResolve([
-            new Error(`响应超时 (${timeoutMs}ms) for request ${requestId}`),
-            null,
-          ]);
+        // 创建超时定时器
+        const timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new BLETimeoutError(
+            `写入响应超时 - 请求ID: ${requestId}, 设备: ${targetDeviceId}, 特征值: ${characteristicIdFinal}`,
+            "write",
+            timeoutMs || 1000
+          ));
         }, timeoutMs || 1000);
 
+        // 将请求信息存入 Map（包含设备和特征值以便精确匹配）
+        this.pendingRequests.set(requestId, {
+          deviceId: targetDeviceId!,
+          characteristicId: characteristicIdFinal,
+          resolve: (result) => {
+            cleanup();
+            resolve(result);
+          },
+          reject: (error) => {
+            cleanup();
+            reject(error);
+          },
+          timeoutId
+        });
+
         try {
-          const [err] = await BluetoothManager.writeBLECharacteristicValue({
+          await wx.writeBLECharacteristicValue({
             deviceId: targetDeviceId,
             serviceId: serviceIdFinal,
             characteristicId: characteristicIdFinal,
             value: frame,
             writeType: hasResponse ? "write" : "writeNoResponse"
           });
-          if (err) {
-            cleanupAndResolve([err, null]);
-          }
+          console.log(`✔ 写入数据成功 - 请求ID: ${requestId}`);
+          // 等待设备响应（通过特征值变化事件）
         } catch (error) {
-          cleanupAndResolve([error as Error, null]);
+          cleanup();
+          reject(convertWxErrorToBLEError(error));
         }
       });
     } else {
-      return await BluetoothManager.writeBLECharacteristicValue({
-        deviceId: targetDeviceId,
-        serviceId: serviceIdFinal,
-        characteristicId: characteristicIdFinal,
-        value: frame,
-        writeType: hasResponse ? "write" : "writeNoResponse"
-      });
+      try {
+        await wx.writeBLECharacteristicValue({
+          deviceId: targetDeviceId,
+          serviceId: serviceIdFinal,
+          characteristicId: characteristicIdFinal,
+          value: frame,
+          writeType: "writeNoResponse"
+        });
+        console.log(`✔ 写入数据成功（无需响应）`);
+        return { success: true };
+      } catch (error) {
+        throw convertWxErrorToBLEError(error);
+      }
     }
   }
 
@@ -235,13 +272,16 @@ export class IOManager {
    * @param options 读取选项，包含小程序原生字段以及额外的 timeoutMs
    * @param mode 单设备/多设备模式
    * @param connectedSingleDeviceId 单设备模式下的默认设备ID
-   * @returns Promise with error and result
+   * @returns Promise with result
+   * @throws {BLEIOError} 读取失败时抛出
+   * @throws {BLETimeoutError} 超时时抛出
+   * @throws {BLEConfigError} 配置错误时抛出
    */
   async readCharacteristicValue(
     options: readCharacteristicOption,
     mode: "single" | "multiple",
     connectedSingleDeviceId?: string
-  ): Promise<[Error | null, any]> {
+  ): Promise<any> {
     const {
       deviceId: optDeviceId,
       timeoutMs,
@@ -255,12 +295,12 @@ export class IOManager {
       // 单设备模式下，优先使用传入的 deviceId，否则使用已连接的设备ID
       targetDeviceId = optDeviceId || connectedSingleDeviceId;
       if (!targetDeviceId) {
-        return [new Error("单设备模式下未连接任何设备，也未提供设备ID"), null];
+        throw new BLEConfigError("单设备模式下未连接任何设备，也未提供设备ID");
       }
     } else {
       // 多设备模式下，必须提供 deviceId
       if (!optDeviceId) {
-        return [new Error("多设备模式下必须提供设备ID"), null];
+        throw new BLEConfigError("多设备模式下必须提供设备ID");
       }
       targetDeviceId = optDeviceId;
     }
@@ -272,38 +312,51 @@ export class IOManager {
     // 生成一个唯一的请求ID
     const requestId = `req_${this.requestCounter++}`;
 
-    return new Promise<[Error | null, any]>(async (resolve) => {
-      let timeoutId: any;
-
-      const cleanupAndResolve = (result: [Error | null, any]) => {
-        if (timeoutId) clearTimeout(timeoutId);
-        // 从 Map 中删除此请求
+    return new Promise<any>(async (resolve, reject) => {
+      const cleanup = () => {
+        const request = this.pendingRequests.get(requestId);
+        if (request?.timeoutId) {
+          clearTimeout(request.timeoutId);
+        }
         this.pendingRequests.delete(requestId);
-        resolve(result);
       };
 
-      // 将 resolve 函数存入 Map
-      this.pendingRequests.set(requestId, cleanupAndResolve);
-
-      timeoutId = setTimeout(() => {
-        // 超时后，也需要调用 cleanupAndResolve 来确保从 Map 中删除
-        cleanupAndResolve([
-          new Error(`响应超时 (${timeoutMs}ms) for request ${requestId}`),
-          null,
-        ]);
+      // 创建超时定时器
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new BLETimeoutError(
+          `读取响应超时 - 请求ID: ${requestId}, 设备: ${targetDeviceId}, 特征值: ${characteristicIdFinal}`,
+          "read",
+          timeoutMs || 1000
+        ));
       }, timeoutMs || 1000);
 
+      // 将请求信息存入 Map（包含设备和特征值以便精确匹配）
+      this.pendingRequests.set(requestId, {
+        deviceId: targetDeviceId!,
+        characteristicId: characteristicIdFinal,
+        resolve: (result) => {
+          cleanup();
+          resolve(result);
+        },
+        reject: (error) => {
+          cleanup();
+          reject(error);
+        },
+        timeoutId
+      });
+
       try {
-        const [err] = await BluetoothManager.readBLECharacteristicValue({
+        await wx.readBLECharacteristicValue({
           deviceId: targetDeviceId,
           serviceId: serviceIdFinal,
           characteristicId: characteristicIdFinal,
         });
-        if (err) {
-          cleanupAndResolve([err, null]);
-        }
+        console.log(`✔ 读取数据成功 - 请求ID: ${requestId}`);
+        // 等待设备通过特征值变化事件返回数据
       } catch (error) {
-        cleanupAndResolve([error as Error, null]);
+        cleanup();
+        reject(convertWxErrorToBLEError(error));
       }
     });
   }

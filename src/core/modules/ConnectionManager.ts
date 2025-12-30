@@ -2,8 +2,8 @@
  * ConnectionManager - 连接管理模块
  * 负责设备连接、断开、重连、状态监听
  */
-import BluetoothManager from "../BluetoothManager";
 import type { Device, ConnectionStateCallbacks } from "../../types/ble";
+import { BLEConnectionError, BLETimeoutError, convertWxErrorToBLEError } from "../../utils/error";
 
 export class ConnectionManager {
   public connectedDevices: Device[] = []; // 已连接的设备列表
@@ -65,17 +65,34 @@ export class ConnectionManager {
   }
 
   /**
+   * 超时控制 Promise
+   */
+  private withTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
+    let timeoutId: any;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new BLETimeoutError("连接超时", "connection", timeout)),
+        timeout
+      );
+    });
+    return Promise.race([
+      Promise.resolve(promise).finally(() => clearTimeout(timeoutId)),
+      timeoutPromise,
+    ]);
+  }
+
+  /**
    * 连接指定的蓝牙设备
    * @param {Device | string} devOrDeviceId 要连接的蓝牙设备对象或设备ID字符串
    * @param {number} [connectTimeout] 连接超时时间
    * @param {Function} onServicesReady 获取服务和特征值的回调
-   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   * @throws {BLEConnectionError | BLETimeoutError}
    */
   async connectDevice(
     devOrDeviceId: Device | string,
     connectTimeout: number = 6000,
     onServicesReady?: (deviceId: string) => Promise<void>
-  ): Promise<[Error | null, any]> {
+  ): Promise<void> {
     // 如果传入的是字符串 deviceId，则创建一个新的 Device 对象
     let dev: Device;
     if (typeof devOrDeviceId === "string") {
@@ -106,58 +123,45 @@ export class ConnectionManager {
       this.singleConnectedDevice?.isConnect == true
     ) {
       // 如果是单设备模式，先断开当前连接的设备
-      let [disErr, disRes] = await this.disconnectDevice(
-        this.singleConnectedDevice?.deviceId || ""
+      await this.disconnectDevice(this.singleConnectedDevice?.deviceId || "");
+    }
+
+    // 连接设备
+    console.log(`准备连接设备...`);
+    await this.withTimeout(
+      wx.createBLEConnection({ deviceId: dev.deviceId, timeout: connectTimeout }),
+      connectTimeout
+    );
+    console.log(`✔ 连接蓝牙成功！`);
+
+    dev.isConnect = true; // 更新设备状态为已连接
+    if (this.mode === "single") {
+      // 如果是单设备模式，清空已连接设备列表
+      this.connectedDevices = [];
+      this.connectedDevices.push(dev);
+      // 成功连接后，声明当前目标为该设备，同时取消其他设备未完成的重连
+      this.activeTargetDeviceId = dev.deviceId;
+      this.cancelReconnectsExcept(dev.deviceId);
+    } else {
+      let index = this.connectedDevices.findIndex(
+        (d) => d.deviceId === dev.deviceId
       );
-      // 如果断开连接失败，返回错误
-      if (disErr || !disRes) {
-        return [disErr, null];
+      if (index === -1) {
+        this.connectedDevices.push(dev);
       }
     }
 
-  try {
-      // 连接设备
-      const connResult = (await this.withTimeout(
-        BluetoothManager.createBLEConnection(dev.deviceId, connectTimeout),
-        connectTimeout
-      )) as [any, any];
-      let [err, res] = connResult;
+    // 添加历史上已连接过的设备到列表
+    let index = this.historyConnectedDevices.findIndex(
+      (d) => d.deviceId === dev.deviceId
+    );
+    if (index === -1) {
+      this.historyConnectedDevices.push(dev);
+    }
 
-      if (res || err.errCode == -1) {
-        dev.isConnect = true; // 更新设备状态为已连接
-        if (this.mode === "single") {
-          // 如果是单设备模式，清空已连接设备列表
-          this.connectedDevices = [];
-          this.connectedDevices.push(dev);
-          // 成功连接后，声明当前目标为该设备，同时取消其他设备未完成的重连
-          this.activeTargetDeviceId = dev.deviceId;
-          this.cancelReconnectsExcept(dev.deviceId);
-        } else {
-          let index = this.connectedDevices.findIndex(
-            (d) => d.deviceId === dev.deviceId
-          );
-          if (index === -1) {
-            this.connectedDevices.push(dev);
-          }
-        }
-
-        // 添加历史上已连接过的设备到列表
-        let index = this.historyConnectedDevices.findIndex(
-          (d) => d.deviceId === dev.deviceId
-        );
-        if (index === -1) {
-          this.historyConnectedDevices.push(dev);
-        }
-
-        // 调用回调来获取服务和特征值
-        if (onServicesReady) {
-          await onServicesReady(dev.deviceId);
-        }
-      }
-      return [err, res];
-    } catch (error) {
-      console.error(`连接设备 ${dev.name}(${dev.deviceId}) 超时失败:`, error);
-      return [error as Error, null];
+    // 调用回调来获取服务和特征值
+    if (onServicesReady) {
+      await onServicesReady(dev.deviceId);
     }
   }
 
@@ -169,7 +173,7 @@ export class ConnectionManager {
    */
   async attemptReconnect(
     device: Device,
-    onReconnect: (device: Device) => Promise<[Error | null, any]>
+    onReconnect: (device: Device) => Promise<void>
   ): Promise<boolean> {
     const maxRetries = this.maxRetries;
     let retryCount = 0;
@@ -223,9 +227,8 @@ export class ConnectionManager {
         }
 
         // 尝试重新连接
-  const [err, res] = await onReconnect(device);
-
-        if (res || (err as any)?.errCode == -1) {
+        try {
+          await onReconnect(device);
           console.log(`设备 ${device.name}(${device.deviceId}) 重连成功`);
           // 单设备模式，成功重连后更新目标并取消其他设备的重连
           if (this.mode === "single") {
@@ -233,10 +236,11 @@ export class ConnectionManager {
             this.cancelReconnectsExcept(device.deviceId);
           }
           return true;
+        } catch (err) {
+          // 重连失败，继续重试
+          retryCount++;
+          console.log(`第 ${retryCount} 次重连失败:`, err);
         }
-
-        retryCount++;
-        console.log(`第 ${retryCount} 次重连失败`);
       } catch (error) {
         retryCount++;
         console.error(`第 ${retryCount} 次重连发生错误:`, error);
@@ -252,11 +256,11 @@ export class ConnectionManager {
   /**
    * 蓝牙适配器连接状态监听
    * @param {ConnectionStateCallbacks} [callbacks] 设备状态变化时的回调函数
-   * @param {Function} onReconnect 重连时的回调
+   * @param onReconnect 重连时的回调
    */
   onConnectionStateChange(
     callbacks?: ConnectionStateCallbacks,
-    onReconnect?: (device: Device) => Promise<[Error | null, any]>
+    onReconnect?: (device: Device) => Promise<void>
   ): void {
     wx.onBLEConnectionStateChange(async (res) => {
       console.log("onBLEConnectionStateChange", res);
@@ -358,11 +362,11 @@ export class ConnectionManager {
   /**
    * 断开蓝牙连接
    * @param {string} deviceId 设备ID
-   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   * @throws {BLEConnectionError}
    */
-  async disconnectDevice(deviceId: string): Promise<[Error | null, any]> {
+  async disconnectDevice(deviceId: string): Promise<void> {
     if (!deviceId) {
-      return [new Error("必须提供设备ID"), null];
+      throw new BLEConnectionError("必须提供设备ID");
     }
 
     let index = this.connectedDevices.findIndex((d) => d.deviceId === deviceId);
@@ -374,34 +378,16 @@ export class ConnectionManager {
     // 断开前取消该设备的任何重连循环
     this.cancelReconnectForDevice(deviceId);
 
-    let [err, res] = await BluetoothManager.closeBLEConnection(deviceId);
+    console.log(`断开蓝牙连接...`);
+    await wx.closeBLEConnection({ deviceId });
+    console.log(`✔ 断开蓝牙成功！`);
 
-    if (!err && this.mode === "single") {
+    if (this.mode === "single") {
       this.connectedDevices = []; // 清空已连接设备列表
       // 若断开的正是当前目标设备，则清空目标
       if (this.activeTargetDeviceId === deviceId) {
         this.activeTargetDeviceId = undefined;
       }
     }
-
-    return [err, res];
   }
-
-  /**
-   * 超时控制 Promise
-   */
-  private withTimeout<T>(promise: Promise<T>, timeout = 6000): Promise<T> {
-    let timeoutId: number;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error("Timeout")), timeout);
-    });
-
-    return Promise.race([
-      Promise.resolve(promise).finally(() => clearTimeout(timeoutId)),
-      timeoutPromise,
-    ]);
-  }
-  // New public aliases (single canonical names kept above).
-  // Note: old names removed; use the methods and properties defined in this class.
 }

@@ -2,8 +2,8 @@
  * DiscoveryManager - 设备发现管理模块
  * 负责搜索、发现、过滤蓝牙设备
  */
-import BluetoothManager from "../BluetoothManager";
 import type { Device } from "../../types/ble";
+import { convertWxErrorToBLEError } from "../../utils/error";
 
 export class DiscoveryManager {
   public foundDevList: Device[] = []; // 当前已找到的设备列表
@@ -25,16 +25,22 @@ export class DiscoveryManager {
 
   /**
    * 开始搜索蓝牙设备
-   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   * @returns {Promise<any>} 结果
+   * @throws {BLEError} 搜索失败
    */
   async startDeviceDiscovery(
     searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this
       .searchOption
   ) {
-    let [err, res] = await BluetoothManager.startBluetoothDevicesDiscovery(
-      searchOption
-    );
-    return [err, res];
+    try {
+      console.log(`准备搜寻附近的蓝牙外围设备...`);
+      const res = await wx.startBluetoothDevicesDiscovery(searchOption);
+      console.log(`✔ 搜索成功!`);
+      return res;
+    } catch (err) {
+      console.error(`✘ 搜索蓝牙设备失败！`, err);
+      throw convertWxErrorToBLEError(err);
+    }
   }
 
   /**
@@ -97,16 +103,19 @@ export class DiscoveryManager {
 
   /**
    * 停止搜索蓝牙设备
-   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   * @returns {Promise<any>} 结果
+   * @throws {BLEError} 停止失败
    */
-  // 新名：stopDeviceDiscovery
   async stopDeviceDiscovery() {
-    let [err, res] = await BluetoothManager.stopBluetoothDevicesDiscovery();
-
-    if (!err) {
+    try {
+      console.log(`停止查找新设备...`);
+      const res = await wx.stopBluetoothDevicesDiscovery();
+      console.log(`✔ 停止查找设备成功！`);
       this.foundDevList = [];
+      return res;
+    } catch (err) {
+      console.error(`✘ 停止查询设备失败！`, err);
+      throw convertWxErrorToBLEError(err);
     }
-
-    return [err, res];
   }
 }

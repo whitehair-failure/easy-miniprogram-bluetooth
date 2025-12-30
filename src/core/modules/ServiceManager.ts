@@ -2,11 +2,11 @@
  * ServiceManager - 服务与特征值管理模块
  * 负责获取服务、检查特征值、订阅通知
  */
-import BluetoothManager from "../BluetoothManager";
 import type {
   BLEHandlerConfig,
   CharacteristicCheckResult,
 } from "../../types/ble";
+import { BLEServiceError, BLEConfigError, convertWxErrorToBLEError } from "../../utils/error";
 
 export class ServiceManager {
   public readonly config: BLEHandlerConfig;
@@ -18,14 +18,14 @@ export class ServiceManager {
   /**
    * 运行时更新配置
    * 接受部分配置项：serviceUId / writeCharacteristicId / notifyCharacteristicId
-   * 返回 [Error|null, updatedConfig]
+   * @throws {BLEConfigError}
    */
   setBLEHandlerConfig(
     cfg: Partial<BLEHandlerConfig>,
     onConfigUpdated?: () => Promise<void>
-  ): [Error | null, BLEHandlerConfig] {
+  ): BLEHandlerConfig {
     if (!cfg || typeof cfg !== "object") {
-      return [new Error("Invalid config object"), this.config];
+      throw new BLEConfigError("Invalid config object");
     }
 
     // 验证传入的字段类型
@@ -38,14 +38,11 @@ export class ServiceManager {
 
     for (const key of Object.keys(cfg) as Array<string>) {
       if (!allowedKeys.includes(key as any)) {
-        return [new Error(`Unknown config key: ${key}`), this.config];
+        throw new BLEConfigError(`Unknown config key: ${key}`);
       }
       const val = (cfg as any)[key];
       if (val != null && typeof val !== "string") {
-        return [
-          new Error(`Invalid type for ${key}, expected string`),
-          this.config,
-        ];
+        throw new BLEConfigError(`Invalid type for ${key}, expected string`);
       }
     }
 
@@ -63,37 +60,36 @@ export class ServiceManager {
       onConfigUpdated();
     }
 
-    return [null, this.config];
+    return this.config;
   }
 
   /**
    * 获取蓝牙设备的所有服务
-   * @returns {Promise<[Error | null, WechatMiniprogram.BLEService[] | undefined]>} 错误对象和服务列表
+   * @throws {BLEServiceError}
    */
-  async getDeviceServices(deviceId: string) {
-    let [err, res] = await BluetoothManager.getBLEDeviceServices(deviceId);
-    return [err, res];
+  async getDeviceServices(deviceId: string): Promise<WechatMiniprogram.BLEService[]> {
+    console.log(`获取蓝牙设备所有服务...`);
+    const res = await wx.getBLEDeviceServices({ deviceId });
+    console.log(`✔ 获取service成功！`, res);
+    return res.services || [];
   }
 
   /**
    * 检查蓝牙设备的服务是否拥有已设置的特征值
    * @param {string} deviceId 设备ID
    * @param {string} [serviceId] 服务ID（可选，默认使用config中的serviceUId）
-   * @returns {Promise<[Error | null, CharacteristicCheckResult]>} 特征值检查结果
+   * @throws {BLEServiceError | BLEConfigError}
    */
   async validateCharacteristics(
     deviceId: string,
     serviceId?: string
-  ): Promise<[Error | null, CharacteristicCheckResult]> {
-    let [err, res] = await BluetoothManager.getBLEDeviceCharacteristics(
+  ): Promise<CharacteristicCheckResult> {
+    console.log(`开始获取特征值...`);
+    const res = await wx.getBLEDeviceCharacteristics({
       deviceId,
-      serviceId || this.config.serviceUId || ""
-    );
-    console.log("checkCharacteristics", res);
-
-    if (err) {
-      return [err, { success: false }];
-    }
+      serviceId: serviceId || this.config.serviceUId || ""
+    });
+    console.log(`✔ 获取特征值成功！`, res);
 
     // 存储缺失的特征值ID
     const missingCharacteristics: string[] = [];
@@ -129,7 +125,7 @@ export class ServiceManager {
       console.warn(`缺失以下特征值: ${missingCharacteristics.join(", ")}`);
     }
 
-    return [null, result];
+    return result;
   }
 
   // Note: old name `checkCharacteristics` removed. Use `validateCharacteristics`.
@@ -139,21 +135,25 @@ export class ServiceManager {
    * @param {string} deviceId 设备ID
    * @param {string} [serviceId] 服务ID
    * @param {string} [characteristicId] 特征值ID
-   * @returns {Promise<[Error | null, any]>} 错误对象和结果
+   * @throws {BLEConfigError | BLEServiceError}
    */
   async enableCharacteristicNotification(
     deviceId: string,
     serviceId?: string,
     characteristicId?: string
-  ) {
+  ): Promise<void> {
     if (!deviceId) {
-      return [new Error("必须提供设备ID"), null];
+      throw new BLEConfigError("必须提供设备ID");
     }
-    return await BluetoothManager.notifyBLECharacteristicValueChange(
+    console.log(`准备订阅特征值变化...`);
+    await wx.notifyBLECharacteristicValueChange({
       deviceId,
-      serviceId || this.config.serviceUId || "",
-      characteristicId || this.config.notifyCharacteristicId || ""
-    );
+      serviceId: serviceId || this.config.serviceUId || "",
+      characteristicId: characteristicId || this.config.notifyCharacteristicId || "",
+      state: true,
+      type: "indicate"
+    });
+    console.log(`✔ 订阅特征值成功！`);
   }
 
   // Note: old name `notifyBLECharacteristicValueChange` removed. Use `enableCharacteristicNotification`.
