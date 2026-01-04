@@ -30,7 +30,7 @@ export async function getBLEDeviceRSSI(
     console.log(`✔ 获取信号强度成功!`);
     return [null, res];
   } catch (err: any) {
-    console.log(`✘ 获取信号强度失败！${err}`);
+    console.error(`✘ 获取信号强度失败！${err}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -44,7 +44,7 @@ export async function openBluetoothAdapter(
     console.log(`✔ 适配器初始化成功！`);
     return [null, res];
   } catch (err: any) {
-    console.log(`✘ 初始化失败！${errToString(err)}`);
+    console.error(`✘ 初始化失败！${errToString(err)}`);
     return [err, null];
   }
 }
@@ -58,7 +58,7 @@ export async function startBluetoothDevicesDiscovery(
     console.log(`✔ 搜索成功!`);
     return [null, res];
   } catch (err: any) {
-    console.log(`✘ 搜索蓝牙设备失败！${err}`);
+    console.error(`✘ 搜索蓝牙设备失败！${err}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -83,7 +83,7 @@ export async function stopBluetoothDevicesDiscovery(): Promise<[
     console.log(`✔ 停止查找设备成功！`);
     return [null, res];
   } catch (err: any) {
-    console.log(`✘ 停止查询设备失败！${err}`);
+    console.error(`✘ 停止查询设备失败！${err}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -98,7 +98,7 @@ export async function createBLEConnection(
     console.log(`✔ 连接蓝牙成功！`);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 连接蓝牙失败！${errToString(err)}`);
+    console.error(`✘ 连接蓝牙失败！${errToString(err)}`);
     return [err, null];
   }
 }
@@ -112,7 +112,7 @@ export async function closeBLEConnection(
     console.log(`✔ 断开蓝牙成功！`);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 断开蓝牙连接失败！${errToString(err)}`);
+    console.error(`✘ 断开蓝牙连接失败！${errToString(err)}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -127,7 +127,7 @@ export async function closeBluetoothAdapter(): Promise<[
     console.log(`✔ 释放适配器成功！`);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 释放适配器失败！${errToString(err)}`);
+    console.error(`✘ 释放适配器失败！${errToString(err)}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -168,7 +168,7 @@ export async function getBLEDeviceServices(
     console.log("service-res", res);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 获取service失败！${errToString(err)}`);
+    console.error(`✘ 获取service失败！${errToString(err)}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -186,7 +186,7 @@ export async function getBLEDeviceCharacteristics(
     console.log(`✔ 获取特征值成功！`);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 获取特征值失败！${errToString(err)}`);
+    console.error(`✘ 获取特征值失败！${errToString(err)}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -204,7 +204,7 @@ export async function notifyBLECharacteristicValueChange(
     console.log(`✔ 订阅特征值成功！`);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 订阅特征值失败！${errToString(err)}`);
+    console.error(`✘ 订阅特征值失败！${errToString(err)}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -224,7 +224,7 @@ export async function writeBLECharacteristicValue({
     console.log(`✔ 写入数据成功！`);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 写入数据失败！${errToString(err)}`);
+    console.error(`✘ 写入数据失败！${errToString(err)}`);
     return [new Error(errToString(err)), null];
   }
 }
@@ -242,7 +242,7 @@ export async function readBLECharacteristicValue({
     console.log(`✔ 读取数据成功！`);
     return [null, res];
   } catch (err) {
-    console.log(`✘ 读取数据失败！${errToString(err)}`);
+    console.error(`✘ 读取数据失败！${errToString(err)}`);
     return [new Error(errToString(err)), null];
   }
 }
