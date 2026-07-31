@@ -3,6 +3,7 @@
  * 负责适配器的初始化、状态检查、关闭等操作
  */
 import { BLEAdapterError, BLEPermissionError, BLETimeoutError, convertWxErrorToBLEError } from "../../utils/error";
+import { shouldSkipBLEApiCall } from "../../utils/runtime";
 
 export class AdapterManager {
   /**
@@ -32,12 +33,18 @@ export class AdapterManager {
    */
   async getAdapterStatus() {
     try {
-      console.log(`准备初始化蓝牙适配器...`);
-      const res = await wx.openBluetoothAdapter({ mode: "central" });
-      console.log(`✔ 适配器初始化成功！`);
+      console.log(`查看蓝牙适配器状态...`);
+      if (shouldSkipBLEApiCall("getBluetoothAdapterState")) {
+        return {
+          available: true,
+          discovering: false,
+        } as WechatMiniprogram.GetBluetoothAdapterStateSuccessCallbackResult;
+      }
+      const res = await wx.getBluetoothAdapterState();
+      console.log(`✔ 适配器状态获取成功！`);
       return res;
     } catch (err: any) {
-      // 如果打开适配器失败，提示用户检查权限或蓝牙状态
+      // 如果获取适配器状态失败，提示用户检查权限或蓝牙状态
       if (err?.errno === 103 || err?.errCode === 103) {
         throw new BLEPermissionError("请检查是否已授权小程序蓝牙权限", 103, err);
       }
@@ -56,6 +63,9 @@ export class AdapterManager {
   async openAdapter() {
     try {
       console.log(`准备初始化蓝牙适配器...`);
+      if (shouldSkipBLEApiCall("openBluetoothAdapter")) {
+        return { success: true };
+      }
       const res = await wx.openBluetoothAdapter({ mode: "central" });
       console.log(`✔ 适配器初始化成功！`);
       return res;
@@ -73,6 +83,9 @@ export class AdapterManager {
   async closeAdapter() {
     try {
       console.log(`释放蓝牙适配器...`);
+      if (shouldSkipBLEApiCall("closeBluetoothAdapter")) {
+        return { success: true };
+      }
       const res = await wx.closeBluetoothAdapter();
       console.log(`✔ 释放适配器成功！`);
       return res;
@@ -90,6 +103,9 @@ export class AdapterManager {
    */
   async getDeviceRSSI(deviceId: string): Promise<any> {
     try {
+      if (shouldSkipBLEApiCall("getBLEDeviceRSSI")) {
+        return { RSSI: 0 };
+      }
       const res = await wx.getBLEDeviceRSSI({ deviceId });
       console.log(`✔ 获取信号强度成功!`);
       return res;

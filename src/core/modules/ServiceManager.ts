@@ -7,12 +7,47 @@ import type {
   CharacteristicCheckResult,
 } from "../../types/ble";
 import { BLEServiceError, BLEConfigError, convertWxErrorToBLEError } from "../../utils/error";
+import { shouldSkipBLEApiCall } from "../../utils/runtime";
+import { convertConfigUUIDs } from "../../utils/uuid";
 
 export class ServiceManager {
   public readonly config: BLEHandlerConfig;
 
   constructor(config: BLEHandlerConfig) {
-    this.config = config;
+    // 自动将短UUID转换为标准128位UUID
+    const convertedConfig = convertConfigUUIDs(config);
+    this.validateConfig(convertedConfig);
+    this.config = convertedConfig;
+  }
+
+  /**
+   * 验证配置有效性
+   * @throws {BLEConfigError}
+   */
+  private validateConfig(config: BLEHandlerConfig): void {
+    if (!config) {
+      throw new BLEConfigError("BLEHandlerConfig is required");
+    }
+
+    // serviceUId 现在是可选的，仅当提供时进行验证
+    if (config.serviceUId !== undefined && (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")) {
+      throw new BLEConfigError("serviceUId must be a non-empty string or undefined");
+    }
+
+    // 验证特征值 ID（如果提供）
+    const characteristicIds = [
+      config.readCharacteristicId,
+      config.writeCharacteristicId,
+      config.notifyCharacteristicId,
+    ];
+
+    for (const id of characteristicIds) {
+      if (id !== undefined && (typeof id !== "string" || id.trim() === "")) {
+        throw new BLEConfigError(
+          `Invalid characteristic ID: ${id}. Must be a non-empty string or undefined`
+        );
+      }
+    }
   }
 
   /**
@@ -21,8 +56,7 @@ export class ServiceManager {
    * @throws {BLEConfigError}
    */
   setBLEHandlerConfig(
-    cfg: Partial<BLEHandlerConfig>,
-    onConfigUpdated?: () => Promise<void>
+    cfg: Partial<BLEHandlerConfig>
   ): BLEHandlerConfig {
     if (!cfg || typeof cfg !== "object") {
       throw new BLEConfigError("Invalid config object");
@@ -46,19 +80,21 @@ export class ServiceManager {
       }
     }
 
-    // 合并到本地配置
-    if (cfg.serviceUId) this.config.serviceUId = cfg.serviceUId;
-    if (cfg.writeCharacteristicId)
-      this.config.writeCharacteristicId = cfg.writeCharacteristicId;
-    if (cfg.notifyCharacteristicId)
-      this.config.notifyCharacteristicId = cfg.notifyCharacteristicId;
-    if (cfg.readCharacteristicId)
-      this.config.readCharacteristicId = cfg.readCharacteristicId;
+    // 自动将短UUID转换为标准128位UUID
+    const convertedCfg = convertConfigUUIDs(cfg);
 
-    // 如果有回调，执行配置更新后的操作（如重新订阅通知）
-    if (onConfigUpdated) {
-      onConfigUpdated();
-    }
+    // 创建新配置对象进行验证
+    const newConfig = { ...this.config, ...convertedCfg };
+    this.validateConfig(newConfig);
+
+    // 验证通过后，更新配置
+    if (convertedCfg.serviceUId) this.config.serviceUId = convertedCfg.serviceUId;
+    if (convertedCfg.writeCharacteristicId)
+      this.config.writeCharacteristicId = convertedCfg.writeCharacteristicId;
+    if (convertedCfg.notifyCharacteristicId)
+      this.config.notifyCharacteristicId = convertedCfg.notifyCharacteristicId;
+    if (convertedCfg.readCharacteristicId)
+      this.config.readCharacteristicId = convertedCfg.readCharacteristicId;
 
     return this.config;
   }
@@ -69,6 +105,9 @@ export class ServiceManager {
    */
   async getDeviceServices(deviceId: string): Promise<WechatMiniprogram.BLEService[]> {
     console.log(`获取蓝牙设备所有服务...`);
+    if (shouldSkipBLEApiCall("getBLEDeviceServices")) {
+      return [];
+    }
     const res = await wx.getBLEDeviceServices({ deviceId });
     console.log(`✔ 获取service成功！`, res);
     return res.services || [];
@@ -76,6 +115,7 @@ export class ServiceManager {
 
   /**
    * 检查蓝牙设备的服务是否拥有已设置的特征值
+   * 当 serviceUId 未配置时，将跳过验证
    * @param {string} deviceId 设备ID
    * @param {string} [serviceId] 服务ID（可选，默认使用config中的serviceUId）
    * @throws {BLEServiceError | BLEConfigError}
@@ -84,6 +124,16 @@ export class ServiceManager {
     deviceId: string,
     serviceId?: string
   ): Promise<CharacteristicCheckResult> {
+    // 如果未配置 serviceUId 且未提供 serviceId，跳过验证
+    if (!this.config.serviceUId && !serviceId) {
+      console.log(`serviceUId 未配置，跳过特征值验证`);
+      return { success: true };
+    }
+
+    if (shouldSkipBLEApiCall("getBLEDeviceCharacteristics")) {
+      return { success: true };
+    }
+
     console.log(`开始获取特征值...`);
     const res = await wx.getBLEDeviceCharacteristics({
       deviceId,
@@ -94,9 +144,9 @@ export class ServiceManager {
     // 存储缺失的特征值ID
     const missingCharacteristics: string[] = [];
 
-    // 检查写特征值
+    // 检查写特征值（只有配置了才检查）
     if (
-      !this.config.writeCharacteristicId ||
+      this.config.writeCharacteristicId &&
       !res?.characteristics.some(
         (c: any) => c.uuid === this.config.writeCharacteristicId
       )
@@ -104,14 +154,24 @@ export class ServiceManager {
       missingCharacteristics.push("writeCharacteristicId");
     }
 
-    // 检查通知特征值
+    // 检查通知特征值（只有配置了才检查）
     if (
-      !this.config.notifyCharacteristicId ||
+      this.config.notifyCharacteristicId &&
       !res?.characteristics.some(
         (c: any) => c.uuid === this.config.notifyCharacteristicId
       )
     ) {
       missingCharacteristics.push("notifyCharacteristicId");
+    }
+
+    // 检查读特征值（只有配置了才检查）
+    if (
+      this.config.readCharacteristicId &&
+      !res?.characteristics.some(
+        (c: any) => c.uuid === this.config.readCharacteristicId
+      )
+    ) {
+      missingCharacteristics.push("readCharacteristicId");
     }
 
     // 构造返回结果
@@ -132,6 +192,7 @@ export class ServiceManager {
 
   /**
    * 启用蓝牙设备特征值变化的通知功能
+   * 当 serviceUId 和 notifyCharacteristicId 都未配置时，将跳过通知订阅
    * @param {string} deviceId 设备ID
    * @param {string} [serviceId] 服务ID
    * @param {string} [characteristicId] 特征值ID
@@ -145,13 +206,31 @@ export class ServiceManager {
     if (!deviceId) {
       throw new BLEConfigError("必须提供设备ID");
     }
+
+    // 如果未配置 serviceUId 且未提供 serviceId，跳过通知订阅
+    if (!serviceId && !this.config.serviceUId) {
+      console.log(`serviceUId 未配置，跳过特征值通知订阅`);
+      return;
+    }
+
+    // 如果未配置 notifyCharacteristicId 且未提供 characteristicId，跳过通知订阅
+    if (!characteristicId && !this.config.notifyCharacteristicId) {
+      console.log(`notifyCharacteristicId 未配置，跳过特征值通知订阅`);
+      return;
+    }
+
+    if (shouldSkipBLEApiCall("notifyBLECharacteristicValueChange")) {
+      return;
+    }
+
     console.log(`准备订阅特征值变化...`);
+    console.log(`this.config`, this.config);
     await wx.notifyBLECharacteristicValueChange({
       deviceId,
       serviceId: serviceId || this.config.serviceUId || "",
       characteristicId: characteristicId || this.config.notifyCharacteristicId || "",
       state: true,
-      type: "indicate"
+      type: this.config.notifyType || "notification"
     });
     console.log(`✔ 订阅特征值成功！`);
   }

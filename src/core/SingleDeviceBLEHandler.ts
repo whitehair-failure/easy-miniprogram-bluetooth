@@ -7,6 +7,7 @@ import type {
 
 import { BLEHandlerBase } from "./BLEHandler.base";
 import { ConnectionManager } from "./modules/ConnectionManager";
+import { BLEConnectionError } from "../utils/error";
 
 /**
  * 单设备蓝牙工具类
@@ -18,7 +19,13 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
   }
 
   protected createConnectionManager(): ConnectionManager {
-    return new ConnectionManager("single", this.maxRetries, this.reconnectDelay);
+    return new ConnectionManager({
+      mode: "single",
+      connectTimeout: this.connectTimeout,
+      reconnect: this.reconnect,
+      maxRetries: this.maxRetries,
+      reconnectDelay: this.reconnectDelay,
+    });
   }
 
   /**
@@ -35,7 +42,7 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
         await this.getDeviceServices();
         await this.validateCharacteristics(deviceId);
         await this.enableCharacteristicNotification();
-      }
+      },
     );
   }
 
@@ -46,7 +53,7 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
   async disconnectDevice(): Promise<void> {
     const singleDeviceId = this.singleConnectedDevice?.deviceId;
     if (!singleDeviceId) {
-      throw new Error("单设备模式下未连接任何设备");
+      throw new BLEConnectionError("断开蓝牙连接失败，单设备模式下未连接任何设备");
     }
     await this.connectionManager.disconnectDevice(singleDeviceId);
   }
@@ -58,7 +65,7 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
   async getDeviceRSSI(): Promise<number> {
     const singleDeviceId = this.singleConnectedDevice?.deviceId;
     if (!singleDeviceId) {
-      throw new Error("单设备模式下未连接任何设备");
+      throw new BLEConnectionError("获取蓝牙设备信号强度失败，单设备模式下未连接任何设备");
     }
     return await this.adapterManager.getDeviceRSSI(singleDeviceId);
   }
@@ -70,7 +77,7 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
   async getDeviceServices(): Promise<WechatMiniprogram.BLEService[]> {
     const singleDeviceId = this.singleConnectedDevice?.deviceId;
     if (!singleDeviceId) {
-      throw new Error("单设备模式下未连接任何设备");
+      throw new BLEConnectionError("获取蓝牙设备服务失败，单设备模式下未连接任何设备");
     }
     return await this.serviceManager.getDeviceServices(singleDeviceId);
   }
@@ -82,16 +89,16 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
   async enableCharacteristicNotification(
     deviceId?: string,
     serviceId?: string,
-    characteristicId?: string
+    characteristicId?: string,
   ): Promise<void> {
     const targetDeviceId = deviceId || this.singleConnectedDevice?.deviceId;
     if (!targetDeviceId) {
-      throw new Error("单设备模式下未连接任何设备");
+      throw new BLEConnectionError("启用蓝牙设备特征值变化通知失败，单设备模式下未连接任何设备");
     }
     await this.serviceManager.enableCharacteristicNotification(
       targetDeviceId,
       serviceId,
-      characteristicId
+      characteristicId,
     );
   }
 
@@ -99,11 +106,13 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
    * 发送数据帧
    * @throws {BLEIOError | BLETimeoutError | BLEConfigError}
    */
-  async writeCharacteristicValue(options: writeCharacteristicOption): Promise<void> {
-    await this.ioManager.writeCharacteristicValue(
+  async writeCharacteristicValue(
+    options: writeCharacteristicOption,
+  ): Promise<any> {
+    return this.ioManager.writeCharacteristicValue(
       options,
       "single",
-      this.singleConnectedDevice?.deviceId
+      this.singleConnectedDevice?.deviceId,
     );
   }
 
@@ -111,11 +120,13 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
    * 读取数据帧
    * @throws {BLEIOError | BLETimeoutError | BLEConfigError}
    */
-  async readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer> {
+  async readCharacteristicValue(
+    options: readCharacteristicOption,
+  ): Promise<ArrayBuffer> {
     const result = await this.ioManager.readCharacteristicValue(
       options,
       "single",
-      this.singleConnectedDevice?.deviceId
+      this.singleConnectedDevice?.deviceId,
     );
     return result?.value || new ArrayBuffer(0);
   }

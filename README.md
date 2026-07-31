@@ -1,16 +1,18 @@
 # miniprogram-bluetooth-utils
 
-微信小程序低功耗蓝牙（BLE）工具封装库，提供简洁易用的 API 来管理蓝牙设备连接、数据读写等功能。
+微信小程序低功耗蓝牙（BLE）工具封装库，提供简洁的 API 来管理设备发现、连接、通知订阅与数据读写。
+
+> 新用户建议先看 [文档导航](./doc/archive/INDEX.md)。
 
 ## 特性
 
-- 🔌 **简洁的 API** - 封装微信小程序复杂的蓝牙 API，提供统一的 `[Error|null, result]` 风格返回值
-- 🔄 **自动重连** - 支持设备异常断开后的自动重连机制
-- 📱 **单/多设备模式** - 灵活支持单设备或多设备同时连接
-- 🎯 **设备过滤** - 支持按关键字过滤搜索到的蓝牙设备
-- ⏱️ **超时控制** - 连接、读写操作均支持超时控制
-- 📦 **模块化设计** - 代码按职责分离，易于维护和测试
-- 📘 **TypeScript 支持** - 完整的类型定义，开发体验更好
+- 简洁 API：封装微信小程序 BLE 复杂流程，统一 Promise 异步调用。
+- 单/多设备模式：`SingleDeviceBLEHandler`（默认兼容导出 `BLEHandler`）与 `MultiDeviceBLEHandler`。
+- 自动重连：支持设备异常断开后的自动重试（可配置次数与间隔）。
+- 过滤机制：支持白名单 `includeKeys` + 黑名单 `excludeKeys`。
+- 超时控制：连接、读写都支持超时参数。
+- 模块化架构：基类 + 5 个 Manager，职责清晰。
+- TypeScript：完整类型定义与自定义异常类。
 
 ## 安装
 
@@ -18,215 +20,292 @@
 npm install miniprogram-bluetooth-utils
 ```
 
-或直接复制 `dist/` 目录到你的小程序项目中。
+也可以直接复制 `dist/` 到小程序项目中。
+
+## 导出 API
+
+```typescript
+export * from './core/BLEHandler.base';
+export * from './core/SingleDeviceBLEHandler';
+export * from './core/MultiDeviceBLEHandler';
+export * from './utils/error';
+
+// 兼容旧命名
+export { SingleDeviceBLEHandler as BLEHandler };
+```
 
 ## 快速开始
 
-### 基础使用（单设备模式）
+### 单设备模式（推荐）
 
 ```typescript
 import { BLEHandler } from 'miniprogram-bluetooth-utils';
 
-// 初始化蓝牙工具
-const bleHandler = new BLEHandler({
-  mode: 'single', // 单设备模式
+const ble = new BLEHandler({
   config: {
     serviceUId: 'YOUR_SERVICE_UUID',
     writeCharacteristicId: 'YOUR_WRITE_CHARACTERISTIC_UUID',
     notifyCharacteristicId: 'YOUR_NOTIFY_CHARACTERISTIC_UUID',
     readCharacteristicId: 'YOUR_READ_CHARACTERISTIC_UUID',
+    notifyType: 'notify', // 可选: 'notify' | 'indicate'
   },
-  filterKey: ['设备名关键字'], // 可选：按设备名过滤
-  reconnect: true, // 启用自动重连
-  maxRetries: 3, // 最大重连次数
-  reconnectDelay: 3000, // 重连间隔（毫秒）
-  connectTimeout: 10000, // 连接超时时间（毫秒）
   searchOption: {
     allowDuplicatesKey: false,
     interval: 0,
-  }
-});
-
-  // 初始化并搜索设备
-await bleHandler.init((devices) => {
-  console.log('发现设备:', devices);
-  // 选择第一个设备并连接
-  if (devices.length > 0) {
-    bleHandler.connectDevice(devices[0]);
-  }
-});
-
-// 连接状态监听
-bleHandler.onConnectionStateChange({
-  connected: (deviceId) => {
-    console.log('设备已连接:', deviceId);
+    includeKeys: ['设备名关键字'],
+    excludeKeys: ['Test', 'Debug'],
   },
-  disconnected: (deviceId) => {
-    console.log('设备已断开:', deviceId);
+  reconnect: true,
+  maxRetries: 3,
+  reconnectDelay: 500,
+  connectTimeout: 5000,
+});
+
+try {
+  // 1) 初始化: 打开适配器并注册全局监听器
+  await ble.init();
+
+  // 2) 注册设备发现回调（返回解绑函数）
+  const offDeviceFound = ble.addDeviceFoundListener((devices) => {
+    console.log('发现设备:', devices);
+  });
+
+  // 3) 开始搜索
+  await ble.startDeviceDiscovery();
+
+  // 4) 选择并连接设备（示例使用第一个发现设备）
+  const first = ble.foundDevList[0];
+  if (first) {
+    await ble.connectDevice(first);
   }
-});
 
-// 监听特征值变化（推荐）
-const unsubscribe = bleHandler.addCharacteristicValueChangeListener((result) => {
-  console.log('收到数据:', result.value);
-});
-// 取消订阅：
-// unsubscribe();
+  // 5) 监听连接状态（返回解绑函数）
+  const offConnection = ble.addConnectionStateChangeListener((res) => {
+    console.log('连接状态变化:', res.deviceId, res.connected);
+  });
 
-// 写入数据
-const buffer = new ArrayBuffer(8);
-const [writeErr, writeRes] = await bleHandler.writeCharacteristicValue({
-  value: buffer,
-  hasResponse: true, // 等待设备响应
-  timeoutMs: 2000, // 超时时间
-});
+  // 6) 监听特征值变化（返回解绑函数）
+  const offValueChange = ble.addCharacteristicValueChangeListener((res) => {
+    console.log('收到数据:', res.value);
+  });
 
-// 读取数据
-const [readErr, readRes] = await bleHandler.readCharacteristicValue({
-  timeoutMs: 2000,
-});
+  // 7) 写入
+  const buffer = new ArrayBuffer(8);
+  await ble.writeCharacteristicValue({
+    value: buffer,
+    responseConfig: {
+      hasResponse: true,
+      timeoutMs: 2000,
+    },
+  });
+
+  // 8) 读取
+  const data = await ble.readCharacteristicValue({ timeoutMs: 2000 });
+  console.log('读取成功:', data);
+
+  // 使用完后可按需解绑
+  offDeviceFound();
+  offConnection();
+  offValueChange();
+} catch (err) {
+  console.error('BLE 操作失败:', err);
+}
+
+// 页面卸载 / 组件销毁时
+// await ble.release();
 ```
 
 ### 多设备模式
 
 ```typescript
-const bleHandler = new BLEHandler({
-  mode: 'multiple', // 多设备模式
-  config: { /* ... */ },
-  // ... 其他配置
+import { MultiDeviceBLEHandler } from 'miniprogram-bluetooth-utils';
+
+const ble = new MultiDeviceBLEHandler({
+  config: {
+    serviceUId: 'YOUR_SERVICE_UUID',
+    writeCharacteristicId: 'YOUR_WRITE_CHARACTERISTIC_UUID',
+    notifyCharacteristicId: 'YOUR_NOTIFY_CHARACTERISTIC_UUID',
+  },
+  reconnect: true,
+  searchOption: {
+    allowDuplicatesKey: false,
+    interval: 0,
+  },
 });
 
-// 连接多个设备
-await bleHandler.connectDevice(device1);
-await bleHandler.connectDevice(device2);
+await ble.init();
+await ble.startDeviceDiscovery();
 
-// 向指定设备写入数据
-await bleHandler.writeCharacteristicValue({
-  deviceId: device1.deviceId,
-  value: buffer,
-});
+const deviceA = ble.foundDevList[0];
+const deviceB = ble.foundDevList[1];
 
-// 断开指定设备
-await bleHandler.disconnectDevice(device1.deviceId);
+if (deviceA) await ble.connectDevice(deviceA);
+if (deviceB) await ble.connectDevice(deviceB);
+
+if (deviceA) {
+  await ble.writeCharacteristicValue({
+    deviceId: deviceA.deviceId, // 多设备模式必填
+    value: new ArrayBuffer(8),
+    timeoutMs: 2000,
+  });
+}
+
+if (deviceA) {
+  await ble.disconnectDevice(deviceA.deviceId);
+}
 ```
+
+## 初始化与释放
+
+```typescript
+const ble = new BLEHandler(options);
+await ble.init();
+
+// ... 业务逻辑
+
+await ble.release();
+```
+
+- `init()`：打开适配器并注册全局监听器（连接状态、特征值变化）。
+- `release()`：断开所有连接、移除全局监听、关闭适配器；释放后可再次调用 `init()`。
+
+## 核心类型
+
+```typescript
+interface BLEHandlerConstructor {
+  config?: BLEHandlerConfig;
+  searchOption: SearchOption;
+  reconnect?: boolean;
+  connectTimeout?: number;
+  maxRetries?: number;
+  reconnectDelay?: number;
+  mode?: 'single' | 'multiple';
+}
+
+interface BLEHandlerConfig {
+  serviceUId?: string;
+  readCharacteristicId?: string;
+  writeCharacteristicId?: string;
+  notifyCharacteristicId?: string;
+  notifyType?: 'notification' | 'indication';
+}
+```
+
+说明：`serviceUId` 在类型层是可选；若不设置，会跳过基于该服务的特征值校验流程。
+
+## 主要实例方法
+
+### 通用（基类）
+
+- `init()`
+- `release()`
+- `getAdapterStatus()`
+- `openAdapter()`
+- `closeAdapter()`
+- `startDeviceDiscovery(searchOption?)`
+- `stopDeviceDiscovery()`
+- `addDeviceFoundListener(callback)`
+- `addConnectionStateChangeListener(callback)`
+- `addCharacteristicValueChangeListener(callback)`
+- `removeCharacteristicValueChangeListener(callback)`
+- `removeAllCharacteristicValueChangeListeners()`
+- `updateDeviceFilterOptions(filterOptions)`
+- `getDeviceFilterOptions()`
+- `validateCharacteristics(deviceId, serviceId?)`
+- `updateBLEHandlerConfig(cfg)`
+- Getter: `foundDevList`, `historyDevList`, `connectedDevices`, `historyConnectedDevices`, `singleConnectedDevice`, `config`
+
+### 单设备模式
+
+- `connectDevice(devOrDeviceId)`
+- `disconnectDevice()`
+- `getDeviceRSSI()`
+- `getDeviceServices()`
+- `enableCharacteristicNotification(deviceId?, serviceId?, characteristicId?)`
+- `writeCharacteristicValue(options)`
+- `readCharacteristicValue(options)`
+
+### 多设备模式
+
+- `connectDevice(devOrDeviceId)`
+- `disconnectDevice(deviceId)`
+- `getDeviceRSSI(deviceId)`
+- `getDeviceServices(deviceId)`
+- `enableCharacteristicNotification(deviceId, serviceId?, characteristicId?)`
+- `writeCharacteristicValue(options)`（`options.deviceId` 必填）
+- `readCharacteristicValue(options)`（`options.deviceId` 必填）
+
+## 错误处理
+
+所有异步 API 都会抛错，建议统一 `try/catch`。
+
+```typescript
+try {
+  await ble.connectDevice(device);
+} catch (err) {
+  if (err instanceof BLEConnectionError) {
+    // 连接错误处理
+  }
+}
+```
+
+当前自定义异常类（均继承 `BLEError`）：
+
+- `BLEAdapterError`
+- `BLEPermissionError`
+- `BLEConnectionError`
+- `BLETimeoutError`
+- `BLEDeviceNotFoundError`
+- `BLEServiceError`
+- `BLEConfigError`
+- `BLEIOError`
 
 ## 项目结构
 
-项目采用模块化设计，代码按职责划分：
-
-```
+```text
 src/
-├── index.ts                    # 导出入口
+├── index.ts
 ├── core/
-│   ├── BLEHandler.ts           # 主类（门面/协调器）
-│   ├── BluetoothManager.ts     # 微信 API 封装
-│   └── modules/                # 各个功能模块
-│       ├── AdapterManager.ts   # 适配器管理（初始化、状态检查）
-│       ├── ConnectionManager.ts # 连接管理（连接、断开、重连）
-│       ├── DiscoveryManager.ts  # 设备发现（搜索、过滤）
-│       ├── IOManager.ts         # 读写操作（数据传输、请求队列）
-│       └── ServiceManager.ts    # 服务管理（特征值、配置）
+│   ├── BLEHandler.base.ts
+│   ├── SingleDeviceBLEHandler.ts
+│   ├── MultiDeviceBLEHandler.ts
+│   ├── BLEHandler.ts.backup
+│   └── modules/
+│       ├── AdapterManager.ts
+│       ├── DiscoveryManager.ts
+│       ├── ConnectionManager.ts
+│       ├── ServiceManager.ts
+│       └── IOManager.ts
 ├── types/
-│   └── ble.d.ts                # TypeScript 类型定义
+│   └── ble.d.ts
 └── utils/
-    └── error.ts                # 错误处理工具
-```
-
-### 模块说明
-
-- **AdapterManager** - 管理蓝牙适配器的生命周期（打开、关闭、状态检查）
-- **DiscoveryManager** - 处理设备搜索、发现和过滤逻辑
-- **ConnectionManager** - 管理设备连接、断开和自动重连
-- **ServiceManager** - 处理蓝牙服务和特征值的获取、检查、配置
-- **IOManager** - 处理数据读写操作和请求队列管理
-- **BLEHandler** - 主类，作为门面协调各个管理器，提供统一 API
-
-## API 文档
-
-### BLEHandler 构造函数
-
-```typescript
-new BLEHandler(options: BLEHandlerConstructor)
-```
-
-**参数：**
-- `mode`: `'single' | 'multiple'` - 连接模式
-- `config`: `BLEHandlerConfig` - 蓝牙服务和特征值 UUID 配置
-  - `serviceUId`: 服务 UUID
-  - `writeCharacteristicId`: 写特征值 UUID
-  - `notifyCharacteristicId`: 通知特征值 UUID
-  - `readCharacteristicId`: 读特征值 UUID（可选）
-- `filterKey`: `string[]` - 设备名过滤关键字（可选）
-- `reconnect`: `boolean` - 是否启用自动重连（默认 false）
-- `maxRetries`: `number` - 最大重连次数（默认 3）
-- `reconnectDelay`: `number` - 重连间隔毫秒数（默认 3000）
-- `connectTimeout`: `number` - 连接超时毫秒数（可选）
-- `searchOption`: `StartBluetoothDevicesDiscoveryOption` - 搜索配置（可选）
-
-### 主要方法（已更新命名）
-
-#### 初始化与搜索
-- `init(callback?)` - 初始化蓝牙并可选搜索设备
-- `openAdapter()` - 打开蓝牙适配器
-- `getAdapterStatus()` - 检查蓝牙状态和权限
-- `startDeviceDiscovery(options?)` - 开始搜索设备
-- `stopDeviceDiscovery()` - 停止搜索设备
-- `onDeviceFound(callback)` - 监听发现新设备
-
-#### 连接管理
-- `connectDevice(device)` - 连接指定设备
-- `disconnectDevice(deviceId?)` - 断开设备连接
-- `onConnectionStateChange(callbacks)` - 监听连接状态变化
-
-#### 服务与特征值
-- `getDeviceServices(deviceId?)` - 获取设备的所有服务
-- `validateCharacteristics(deviceId, serviceId?)` - 检查特征值是否存在
-- `enableCharacteristicNotification(deviceId, serviceId?, characteristicId?)` - 订阅特征值通知
-- `updateBLEHandlerConfig(config)` - 运行时更新配置
-
-#### 数据读写
-- `writeCharacteristicValue(options)` - 写入数据
-- `readCharacteristicValue(options)` - 读取数据
-- `addCharacteristicValueChangeListener(callback)` - 监听特征值变化（返回取消订阅函数）
-
-#### 其他
-- `getDeviceRSSI(deviceId?)` - 获取设备信号强度
-- `closeAdapter()` - 关闭蓝牙适配器
-- `release(callback?)` - 释放所有资源
-
-### 返回值格式
-
-所有异步方法均返回 `Promise<[Error | null, any]>` 格式：
-
-```typescript
-const [err, res] = await bleHandler.connectDevice(device);
-if (err) {
-  console.error('连接失败:', err);
-} else {
-  console.log('连接成功:', res);
-}
+    └── error.ts
 ```
 
 ## 开发
 
 ```bash
-# 安装依赖
 npm install
-
-# 构建
 npm run build
-
-# 清理构建产物
 npm run clean
+npx tsc --noEmit
 ```
+
+## 文档
+
+- [文档导航](./doc/archive/INDEX.md)
+- [详细示例](./doc/archive/EXAMPLES.md)
+- [架构设计](./doc/archive/ARCHITECTURE.md)
+- [设备过滤指南](./doc/archive/DEVICE_FILTER_GUIDE.md)
+- [API 迁移说明](./doc/archive/RENAME.md)
+- [更新日志](./CHANGELOG.md)
 
 ## 注意事项
 
-1. **微信基础库版本**：请确保小程序基础库版本支持所需的蓝牙 API
-2. **权限配置**：需要在 `app.json` 中配置蓝牙权限
-3. **UUID 格式**：服务和特征值 UUID 需要符合微信小程序的格式要求
-4. **错误处理**：建议对所有蓝牙操作进行错误处理
-5. **资源释放**：页面卸载时记得调用 `release()` 方法释放资源
+1. 确保微信基础库版本支持所需 BLE API。
+2. 在 `app.json` 配置蓝牙权限。
+3. 建议所有 BLE 操作都使用 `try/catch`。
+4. 页面卸载时调用 `release()` 释放资源。
 
 ## 许可证
 
@@ -234,4 +313,4 @@ MIT
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交 Issue 和 Pull Request。

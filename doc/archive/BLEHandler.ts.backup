@@ -915,8 +915,8 @@ export class BLEHandler {
         }
       }
     }
-    await wx.offBLECharacteristicValueChange();
-    await wx.offBLEConnectionStateChange();
+    wx.offBLECharacteristicValueChange();
+    wx.offBLEConnectionStateChange();
     await this.closeBLEAdapter();
     if (callback) callback();
   }
