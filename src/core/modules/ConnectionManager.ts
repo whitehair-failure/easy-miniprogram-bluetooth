@@ -3,11 +3,6 @@
  * 负责设备连接、断开、重连、状态监听。
  */
 import type { Device } from "../../types/ble";
-import {
-  BLEConnectionError,
-  BLETimeoutError,
-  convertWxErrorToBLEError,
-} from "../../utils/error";
 import { isHarmonyOS, shouldSkipBLEApiCall } from "../../utils/runtime";
 
 export class ConnectionManager {
@@ -102,28 +97,11 @@ export class ConnectionManager {
   }
 
   /**
-   * 超时控制 Promise
-   */
-  private withTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
-    let timeoutId: any;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(
-        () => reject(new BLETimeoutError("连接超时", "connection", timeout)),
-        timeout,
-      );
-    });
-    return Promise.race([
-      Promise.resolve(promise).finally(() => clearTimeout(timeoutId)),
-      timeoutPromise,
-    ]);
-  }
-
-  /**
    * 连接指定的蓝牙设备
    * @param {Device | string} devOrDeviceId 要连接的蓝牙设备对象或设备ID字符串
    * @param {number} [connectTimeout] 连接超时时间
    * @param {Function} onServicesReady 获取服务和特征值的回调
-   * @throws {BLEConnectionError | BLETimeoutError}
+   * @throws {Error} 连接失败
    */
   async connectDevice(
     devOrDeviceId: Device | string,
@@ -207,7 +185,7 @@ export class ConnectionManager {
       }
     } catch (err) {
       console.error(`连接蓝牙设备失败！`, err);
-      throw convertWxErrorToBLEError(err);
+      throw err;
     }
   }
 
@@ -449,11 +427,11 @@ export class ConnectionManager {
   /**
    * 断开蓝牙连接
    * @param {string} deviceId 设备ID
-   * @throws {BLEConnectionError}
+   * @throws {Error}
    */
   async disconnectDevice(deviceId: string): Promise<void> {
     if (!deviceId) {
-      throw new BLEConnectionError("必须提供设备ID");
+      throw new Error("必须提供设备ID");
     }
 
     let index = this._connectedDevices.findIndex(

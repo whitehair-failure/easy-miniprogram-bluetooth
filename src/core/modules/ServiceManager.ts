@@ -6,7 +6,6 @@ import type {
   BLEHandlerConfig,
   CharacteristicCheckResult,
 } from "../../types/ble";
-import { BLEServiceError, BLEConfigError, convertWxErrorToBLEError } from "../../utils/error";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 import { convertConfigUUIDs } from "../../utils/uuid";
 
@@ -22,16 +21,16 @@ export class ServiceManager {
 
   /**
    * 验证配置有效性
-   * @throws {BLEConfigError}
+   * @throws {Error}
    */
   private validateConfig(config: BLEHandlerConfig): void {
     if (!config) {
-      throw new BLEConfigError("BLEHandlerConfig is required");
+      throw new Error("BLEHandlerConfig is required");
     }
 
     // serviceUId 现在是可选的，仅当提供时进行验证
     if (config.serviceUId !== undefined && (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")) {
-      throw new BLEConfigError("serviceUId must be a non-empty string or undefined");
+      throw new Error("serviceUId must be a non-empty string or undefined");
     }
 
     // 验证特征值 ID（如果提供）
@@ -43,7 +42,7 @@ export class ServiceManager {
 
     for (const id of characteristicIds) {
       if (id !== undefined && (typeof id !== "string" || id.trim() === "")) {
-        throw new BLEConfigError(
+        throw new Error(
           `Invalid characteristic ID: ${id}. Must be a non-empty string or undefined`
         );
       }
@@ -53,13 +52,13 @@ export class ServiceManager {
   /**
    * 运行时更新配置
    * 接受部分配置项：serviceUId / writeCharacteristicId / notifyCharacteristicId
-   * @throws {BLEConfigError}
+   * @throws {Error}
    */
   setBLEHandlerConfig(
     cfg: Partial<BLEHandlerConfig>
   ): BLEHandlerConfig {
     if (!cfg || typeof cfg !== "object") {
-      throw new BLEConfigError("Invalid config object");
+      throw new Error("Invalid config object");
     }
 
     // 验证传入的字段类型
@@ -72,11 +71,11 @@ export class ServiceManager {
 
     for (const key of Object.keys(cfg) as Array<string>) {
       if (!allowedKeys.includes(key as any)) {
-        throw new BLEConfigError(`Unknown config key: ${key}`);
+        throw new Error(`Unknown config key: ${key}`);
       }
       const val = (cfg as any)[key];
       if (val != null && typeof val !== "string") {
-        throw new BLEConfigError(`Invalid type for ${key}, expected string`);
+        throw new Error(`Invalid type for ${key}, expected string`);
       }
     }
 
@@ -101,7 +100,7 @@ export class ServiceManager {
 
   /**
    * 获取蓝牙设备的所有服务
-   * @throws {BLEServiceError}
+   * @throws {Error}
    */
   async getDeviceServices(deviceId: string): Promise<WechatMiniprogram.BLEService[]> {
     console.log(`获取蓝牙设备所有服务...`);
@@ -118,7 +117,7 @@ export class ServiceManager {
    * 当 serviceUId 未配置时，将跳过验证
    * @param {string} deviceId 设备ID
    * @param {string} [serviceId] 服务ID（可选，默认使用config中的serviceUId）
-   * @throws {BLEServiceError | BLEConfigError}
+   * @throws {Error}
    */
   async validateCharacteristics(
     deviceId: string,
@@ -196,7 +195,7 @@ export class ServiceManager {
    * @param {string} deviceId 设备ID
    * @param {string} [serviceId] 服务ID
    * @param {string} [characteristicId] 特征值ID
-   * @throws {BLEConfigError | BLEServiceError}
+   * @throws {Error}
    */
   async enableCharacteristicNotification(
     deviceId: string,
@@ -204,7 +203,7 @@ export class ServiceManager {
     characteristicId?: string
   ): Promise<void> {
     if (!deviceId) {
-      throw new BLEConfigError("必须提供设备ID");
+      throw new Error("必须提供设备ID");
     }
 
     // 如果未配置 serviceUId 且未提供 serviceId，跳过通知订阅

@@ -623,34 +623,23 @@ const listenerExample = async () => {
 
 ## 错误处理
 
-### 异常类型
+> 注意：库从 0.3.0 起**不再定义自定义异常类**，直接抛出微信原生错误对象或原生 `Error`。
 
-库定义了 7 种异常类型，便于精确错误处理。
+### 错误类型
+
+微信原生错误对象携带 `errMsg`、`errno` / `errCode` 字段，可用于区分错误；参数校验 / 超时场景抛出原生 `Error`。
 
 ```typescript
-import {
-  BLEError,              // 基础异常
-  BLEAdapterError,       // 蓝牙适配器错误
-  BLEPermissionError,    // 权限错误
-  BLEConnectionError,    // 连接错误
-  BLETimeoutError,       // 超时错误
-  BLEServiceError,       // 服务/特征值错误
-  BLEIOError,            // 读写错误
-  BLEConfigError,        // 配置错误
-} from 'miniprogram-bluetooth-utils';
-
-// 检查异常类型
 try {
   await handler.connectDevice(device);
 } catch (err) {
-  if (err instanceof BLETimeoutError) {
-    console.error('❌ 连接超时，请重试');
-  } else if (err instanceof BLEPermissionError) {
+  // 微信原生错误对象（errMsg / errno / errCode）或原生 Error
+  if (err?.errno === 103 || err?.errCode === 103) {
     console.error('❌ 缺少蓝牙权限，请在应用权限中授予');
-  } else if (err instanceof BLEConnectionError) {
-    console.error('❌ 连接失败，请检查设备是否在线');
+  } else if (err?.errMsg?.includes('timeout')) {
+    console.error('❌ 连接超时，请重试');
   } else {
-    console.error('❌ 未知错误:', err);
+    console.error('❌ 错误:', err?.errMsg || err);
   }
 }
 ```
@@ -678,10 +667,10 @@ class BluetoothDeviceManager {
       try {
         await this.handler.openAdapter();
       } catch (err) {
-        if (err instanceof BLEPermissionError) {
+        if (err?.errno === 103 || err?.errCode === 103) {
           throw new Error('请在系统设置中授予蓝牙权限');
         }
-        if (err instanceof BLEAdapterError) {
+        if (err?.errno === 1500102 || err?.errCode === 10001) {
           throw new Error('请打开手机蓝牙后重试');
         }
         throw err;
@@ -698,10 +687,10 @@ class BluetoothDeviceManager {
       await this.handler.enableCharacteristicNotification();
       console.log('✅ 连接成功');
     } catch (err) {
-      if (err instanceof BLETimeoutError) {
+      if (err?.errMsg?.includes('timeout')) {
         console.error('❌ 连接超时，设备可能距离太远');
         // 自动重试或提示用户
-      } else if (err instanceof BLEConnectionError) {
+      } else if (err?.errno === 1500102 || err?.errCode === 10001) {
         console.error('❌ 连接被拒绝或设备不支持此服务');
       }
       throw err;
@@ -716,10 +705,10 @@ class BluetoothDeviceManager {
         timeoutMs: 3000,
       });
     } catch (err) {
-      if (err instanceof BLETimeoutError) {
+      if (err?.message?.includes('超时')) {
         console.error('❌ 设备未及时响应，请检查连接');
-      } else if (err instanceof BLEIOError) {
-        console.error('❌ 数据写入失败');
+      } else {
+        console.error('❌ 数据写入失败:', err?.errMsg || err);
       }
       throw err;
     }
@@ -727,15 +716,15 @@ class BluetoothDeviceManager {
 
   handleError(operation, err) {
     console.error(`❌ ${operation}失败:`, {
-      type: err.constructor.name,
-      message: err.message,
-      errorCode: err.errorCode,
+      type: err?.constructor?.name,
+      message: err?.errMsg || err?.message,
+      errorCode: err?.errCode ?? err?.errno,
     });
 
     // 可以上报到日志系统
     wx.reportAnalytics('ble_error', {
       operation,
-      errorType: err.constructor.name,
+      errorType: err?.constructor?.name,
     });
   }
 

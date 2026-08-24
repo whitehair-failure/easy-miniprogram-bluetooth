@@ -145,7 +145,7 @@ export abstract class BLEHandlerBase {
 
   /**
    * 运行时更新 BLEHandler 的配置
-   * @throws {BLEConfigError}
+   * @throws {Error}
    */
   async updateBLEHandlerConfig(cfg: Partial<BLEHandlerConfig>): Promise<BLEHandlerConfig> {
     this.ioManager.setBLEHandlerConfig(cfg);
@@ -160,7 +160,7 @@ export abstract class BLEHandlerBase {
 
   /**
    * 检查蓝牙开启状态和权限授予状态
-   * @throws {BLEAdapterError | BLEPermissionError}
+   * @throws {Error}
    */
   async getAdapterStatus(): Promise<WechatMiniprogram.GetBluetoothAdapterStateSuccessCallbackResult> {
     return await this.adapterManager.getAdapterStatus();
@@ -168,7 +168,7 @@ export abstract class BLEHandlerBase {
 
   /**
    * 初始化并打开蓝牙适配器
-   * @throws {BLEAdapterError}
+   * @throws {Error}
    */
   async openAdapter(): Promise<void> {
     await this.adapterManager.openAdapter();
@@ -176,7 +176,7 @@ export abstract class BLEHandlerBase {
 
   /**
    * 开始搜索蓝牙设备
-   * @throws {BLEAdapterError}
+   * @throws {Error}
    */
   async startDeviceDiscovery(
     searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this.searchOption
@@ -195,7 +195,7 @@ export abstract class BLEHandlerBase {
 
   /**
    * 停止搜索蓝牙设备
-   * @throws {BLEAdapterError}
+   * @throws {Error}
    */
   async stopDeviceDiscovery(): Promise<void> {
     await this.discoveryManager.stopDeviceDiscovery();
@@ -203,7 +203,7 @@ export abstract class BLEHandlerBase {
 
   /**
    * 连接指定的蓝牙设备（由子类实现）
-   * @throws {BLEConnectionError | BLETimeoutError}
+   * @throws {Error}
    */
   abstract connectDevice(devOrDeviceId: Device | string): Promise<void>;
 
@@ -220,25 +220,25 @@ export abstract class BLEHandlerBase {
 
   /**
    * 断开蓝牙连接（由子类实现）
-   * @throws {BLEConnectionError}
+   * @throws {Error}
    */
   abstract disconnectDevice(deviceId?: string): Promise<void>;
 
   /**
    * 获取蓝牙设备信号强度（由子类实现）
-   * @throws {BLEAdapterError}
+   * @throws {Error}
    */
   abstract getDeviceRSSI(deviceId?: string): Promise<number>;
 
   /**
    * 获取蓝牙设备的所有服务（由子类实现）
-   * @throws {BLEServiceError}
+   * @throws {Error}
    */
   abstract getDeviceServices(deviceId?: string): Promise<WechatMiniprogram.BLEService[]>;
 
   /**
    * 检查蓝牙设备的服务是否拥有已设置的特征值
-   * @throws {BLEServiceError | BLEConfigError}
+   * @throws {Error}
    */
   async validateCharacteristics(
     deviceId: string,
@@ -249,7 +249,7 @@ export abstract class BLEHandlerBase {
 
   /**
    * 启用蓝牙设备特征值变化的通知功能（由子类实现）
-   * @throws {BLEServiceError | BLEConfigError}
+   * @throws {Error}
    */
   abstract enableCharacteristicNotification(
     deviceId: string,
@@ -288,19 +288,19 @@ export abstract class BLEHandlerBase {
 
   /**
    * 发送数据帧（由子类实现）
-   * @throws {BLEIOError | BLETimeoutError | BLEConfigError}
+   * @throws {Error}
    */
   abstract writeCharacteristicValue(options: writeCharacteristicOption): Promise<any>;
 
   /**
    * 读取数据帧（由子类实现）
-   * @throws {BLEIOError | BLETimeoutError | BLEConfigError}
+   * @throws {Error}
    */
   abstract readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer>;
 
   /**
    * 关闭蓝牙适配器
-   * @throws {BLEAdapterError}
+   * @throws {Error}
    */
   async closeAdapter(): Promise<void> {
     await this.adapterManager.closeAdapter();
@@ -341,7 +341,7 @@ export abstract class BLEHandlerBase {
   /**
    * 初始化蓝牙功能
    * 必须在构造后调用，确保蓝牙适配器初始化并注册全局监听器
-   * @throws {BLEAdapterError | BLEConnectionError}
+   * @throws {Error}
    */
   async init(): Promise<void> {
     // 1. 打开蓝牙适配器

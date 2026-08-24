@@ -12,7 +12,7 @@
 - 过滤机制：支持白名单 `includeKeys` + 黑名单 `excludeKeys`。
 - 超时控制：连接、读写都支持超时参数。
 - 模块化架构：基类 + 5 个 Manager，职责清晰。
-- TypeScript：完整类型定义与自定义异常类。
+- TypeScript：完整类型定义。
 
 ## 安装
 
@@ -28,7 +28,6 @@ npm install miniprogram-bluetooth-utils
 export * from './core/BLEHandler.base';
 export * from './core/SingleDeviceBLEHandler';
 export * from './core/MultiDeviceBLEHandler';
-export * from './utils/error';
 
 // 兼容旧命名
 export { SingleDeviceBLEHandler as BLEHandler };
@@ -237,28 +236,26 @@ interface BLEHandlerConfig {
 
 ## 错误处理
 
-所有异步 API 都会抛错，建议统一 `try/catch`。
+所有方法**抛出异常**（不返回 `[err, result]` 元组），建议统一 `try/catch`。
+
+库不再定义自定义异常类：**catch 到的 `err` 就是原始微信小程序错误对象或原生 `Error`**。微信原生错误携带 `errMsg`、`errno` / `errCode` 字段，可按需据此区分错误类型。
 
 ```typescript
 try {
   await ble.connectDevice(device);
 } catch (err) {
-  if (err instanceof BLEConnectionError) {
-    // 连接错误处理
+  // 微信原生错误对象（errMsg / errno / errCode）或原生 Error
+  if (err?.errno === 103 || err?.errCode === 103) {
+    // 蓝牙权限未授权
+  } else if (err?.errMsg?.includes('timeout')) {
+    // 超时
+  } else {
+    console.error('BLE 操作失败:', err?.errMsg || err);
   }
 }
 ```
 
-当前自定义异常类（均继承 `BLEError`）：
-
-- `BLEAdapterError`
-- `BLEPermissionError`
-- `BLEConnectionError`
-- `BLETimeoutError`
-- `BLEDeviceNotFoundError`
-- `BLEServiceError`
-- `BLEConfigError`
-- `BLEIOError`
+另外，部分参数校验错误（如"必须提供设备ID"）和超时错误会抛出原生 `Error`（消息含超时描述）。
 
 ## 项目结构
 
@@ -279,7 +276,8 @@ src/
 ├── types/
 │   └── ble.d.ts
 └── utils/
-    └── error.ts
+    ├── runtime.ts
+    └── uuid.ts
 ```
 
 ## 开发
@@ -298,7 +296,7 @@ npx tsc --noEmit
 - [架构设计](./doc/archive/ARCHITECTURE.md)
 - [设备过滤指南](./doc/archive/DEVICE_FILTER_GUIDE.md)
 - [API 迁移说明](./doc/archive/RENAME.md)
-- [更新日志](./CHANGELOG.md)
+- [更新日志](./change-log/*)
 
 ## 注意事项
 

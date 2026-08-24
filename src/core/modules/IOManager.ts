@@ -7,12 +7,6 @@ import type {
   readCharacteristicOption,
   BLEHandlerConfig,
 } from "../../types/ble";
-import {
-  BLEIOError,
-  BLETimeoutError,
-  BLEConfigError,
-  convertWxErrorToBLEError,
-} from "../../utils/error";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 import { convertConfigUUIDs } from "../../utils/uuid";
 
@@ -50,11 +44,11 @@ export class IOManager {
 
   /**
    * 验证配置有效性
-   * @throws {BLEConfigError}
+   * @throws {Error}
    */
   private validateConfig(config: BLEHandlerConfig): void {
     if (!config) {
-      throw new BLEConfigError("BLEHandlerConfig is required");
+      throw new Error("BLEHandlerConfig is required");
     }
 
     // serviceUId 现在是可选的，仅当提供时进行验证
@@ -62,7 +56,7 @@ export class IOManager {
       config.serviceUId !== undefined &&
       (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")
     ) {
-      throw new BLEConfigError(
+      throw new Error(
         "serviceUId must be a non-empty string or undefined",
       );
     }
@@ -76,7 +70,7 @@ export class IOManager {
 
     for (const id of characteristicIds) {
       if (id !== undefined && (typeof id !== "string" || id.trim() === "")) {
-        throw new BLEConfigError(
+        throw new Error(
           `Invalid characteristic ID: ${id}. Must be a non-empty string or undefined`,
         );
       }
@@ -86,11 +80,11 @@ export class IOManager {
   /**
    * 运行时更新配置
    * 接受部分配置项：serviceUId / writeCharacteristicId / notifyCharacteristicId
-   * @throws {BLEConfigError}
+   * @throws {Error}
    */
   setBLEHandlerConfig(cfg: Partial<BLEHandlerConfig>): BLEHandlerConfig {
     if (!cfg || typeof cfg !== "object") {
-      throw new BLEConfigError("Invalid config object");
+      throw new Error("Invalid config object");
     }
 
     // 验证传入的字段类型
@@ -103,11 +97,11 @@ export class IOManager {
 
     for (const key of Object.keys(cfg) as Array<string>) {
       if (!allowedKeys.includes(key as any)) {
-        throw new BLEConfigError(`Unknown config key: ${key}`);
+        throw new Error(`Unknown config key: ${key}`);
       }
       const val = (cfg as any)[key];
       if (val != null && typeof val !== "string") {
-        throw new BLEConfigError(`Invalid type for ${key}, expected string`);
+        throw new Error(`Invalid type for ${key}, expected string`);
       }
     }
 
@@ -273,9 +267,9 @@ export class IOManager {
    * @param mode 单设备/多设备模式
    * @param connectedSingleDeviceId 单设备模式下的默认设备ID
    * @returns Promise with result
-   * @throws {BLEIOError} 写入失败时抛出
-   * @throws {BLETimeoutError} 超时时抛出
-   * @throws {BLEConfigError} 配置错误时抛出
+   * @throws {Error} 写入失败时抛出
+   * @throws {Error} 超时时抛出
+   * @throws {Error} 配置错误时抛出
    */
   async writeCharacteristicValue(
     options: writeCharacteristicOption,
@@ -303,12 +297,12 @@ export class IOManager {
       // 单设备模式下，优先使用传入的 deviceId，否则使用已连接的设备ID
       targetDeviceId = optDeviceId || connectedSingleDeviceId;
       if (!targetDeviceId) {
-        throw new BLEConfigError("单设备模式下未连接任何设备，也未提供设备ID");
+        throw new Error("单设备模式下未连接任何设备，也未提供设备ID");
       }
     } else {
       // 多设备模式下，必须提供 deviceId
       if (!optDeviceId) {
-        throw new BLEConfigError("多设备模式下必须提供设备ID");
+        throw new Error("多设备模式下必须提供设备ID");
       }
       targetDeviceId = optDeviceId;
     }
@@ -346,10 +340,8 @@ export class IOManager {
         const timeoutId = setTimeout(() => {
           cleanup();
           reject(
-            new BLETimeoutError(
+            new Error(
               `写入响应超时 - 请求ID: ${requestId}, 设备: ${targetDeviceId}, 特征值: ${respCharIdFinal}`,
-              "write",
-              timeoutMs || 1000,
             ),
           );
         }, timeoutMs || 1000);
@@ -392,7 +384,7 @@ export class IOManager {
           // 等待设备响应（通过特征值变化事件）
         } catch (error) {
           cleanup();
-          reject(convertWxErrorToBLEError(error));
+          reject(error);
         }
       });
     } else {
@@ -411,7 +403,7 @@ export class IOManager {
         console.log(`✔ 写入数据成功（无需响应）`);
         return { success: true };
       } catch (error) {
-        throw convertWxErrorToBLEError(error);
+        throw error;
       }
     }
   }
@@ -424,9 +416,9 @@ export class IOManager {
    * @param mode 单设备/多设备模式
    * @param connectedSingleDeviceId 单设备模式下的默认设备ID
    * @returns Promise with result
-   * @throws {BLEIOError} 读取失败时抛出
-   * @throws {BLETimeoutError} 超时时抛出
-   * @throws {BLEConfigError} 配置错误时抛出
+   * @throws {Error} 读取失败时抛出
+   * @throws {Error} 超时时抛出
+   * @throws {Error} 配置错误时抛出
    */
   async readCharacteristicValue(
     options: readCharacteristicOption,
@@ -446,12 +438,12 @@ export class IOManager {
       // 单设备模式下，优先使用传入的 deviceId，否则使用已连接的设备ID
       targetDeviceId = optDeviceId || connectedSingleDeviceId;
       if (!targetDeviceId) {
-        throw new BLEConfigError("单设备模式下未连接任何设备，也未提供设备ID");
+        throw new Error("单设备模式下未连接任何设备，也未提供设备ID");
       }
     } else {
       // 多设备模式下，必须提供 deviceId
       if (!optDeviceId) {
-        throw new BLEConfigError("多设备模式下必须提供设备ID");
+        throw new Error("多设备模式下必须提供设备ID");
       }
       targetDeviceId = optDeviceId;
     }
@@ -485,10 +477,8 @@ export class IOManager {
       const timeoutId = setTimeout(() => {
         cleanup();
         reject(
-          new BLETimeoutError(
+          new Error(
             `读取响应超时 - 请求ID: ${requestId}, 设备: ${targetDeviceId}, 特征值: ${characteristicIdFinal}`,
-            "read",
-            timeoutMs || 1000,
           ),
         );
       }, timeoutMs || 1000);
@@ -518,7 +508,7 @@ export class IOManager {
         // 等待设备通过特征值变化事件返回数据
       } catch (error) {
         cleanup();
-        reject(convertWxErrorToBLEError(error));
+        reject(error);
       }
     });
   }

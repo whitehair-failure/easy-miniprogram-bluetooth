@@ -100,16 +100,16 @@ get connectedDevices(): Device[] {
 }
 ```
 
-### 5. 异常体系
-统一使用自定义异常，便于用户精确错误处理。
+### 5. 错误处理
+所有方法统一**异常抛出**（不返回 `[err, result]` 元组）。catch 到微信原生错误时直接 `throw err` 透传（保留 `errMsg` / `errno` / `errCode`），参数校验 / 超时抛原生 `Error`。
 ```typescript
 try {
   await handler.connectDevice(device);
 } catch (err) {
-  if (err instanceof BLETimeoutError) {
-    // 处理超时
-  } else if (err instanceof BLEPermissionError) {
+  if (err?.errno === 103 || err?.errCode === 103) {
     // 处理权限问题
+  } else if (err?.errMsg?.includes('timeout')) {
+    // 处理超时
   }
 }
 ```
@@ -247,23 +247,18 @@ pendingRequests.set(requestId, ...)
 
 ## 错误处理体系
 
-```
-BLEError (基础异常)
-├── BLEAdapterError (适配器相关)
-├── BLEPermissionError (权限相关)
-├── BLEConnectionError (连接相关)
-├── BLETimeoutError (超时)
-├── BLEServiceError (服务相关)
-├── BLEIOError (读写相关)
-└── BLEConfigError (配置相关)
-```
+> 0.3.0 起移除自定义异常类（BLEError 体系），统一透传微信原生错误 / 抛原生 `Error`。
+
+- **微信 API 调用失败**：直接 `throw err`，错误对象含 `errMsg`、`errno` / `errCode`
+- **参数 / 配置校验失败**：`throw new Error("...")`
+- **超时**：`throw new Error("...超时...")`（消息含超时描述）
 
 **使用模式**：
 ```typescript
 try {
   // 蓝牙操作
 } catch (err) {
-  if (err instanceof BLETimeoutError) {
+  if (err?.errMsg?.includes('timeout')) {
     // 特定处理超时
   } else {
     // 通用处理
@@ -329,11 +324,12 @@ onUnload() {
 3. 在子类中暴露 public 方法
 
 ### 自定义错误处理
-继承现有异常类：
+直接继承原生 `Error`（库自身不再提供可继承的异常基类）：
 ```typescript
-class MyCustomError extends BLEError {
+class MyCustomError extends Error {
   constructor(message: string) {
-    super(message, 'CUSTOM');
+    super(message);
+    this.name = 'MyCustomError';
   }
 }
 ```

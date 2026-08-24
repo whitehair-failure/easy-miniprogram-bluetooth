@@ -7,7 +7,6 @@ import type {
 
 import { BLEHandlerBase } from "./BLEHandler.base";
 import { ConnectionManager } from "./modules/ConnectionManager";
-import { BLEConfigError } from "../utils/error";
 
 /**
  * 多设备蓝牙工具类
@@ -31,7 +30,7 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 连接指定的蓝牙设备
    * @param {Device | string} devOrDeviceId 蓝牙设备对象或设备ID字符串
-   * @throws {BLEConnectionError | BLETimeoutError}
+   * @throws {Error}
    */
   async connectDevice(devOrDeviceId: Device | string): Promise<void> {
     // 解析设备ID
@@ -52,11 +51,11 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 断开蓝牙连接
    * @param {string} deviceId 设备ID（必需）
-   * @throws {BLEConnectionError}
+   * @throws {Error}
    */
   async disconnectDevice(deviceId: string): Promise<void> {
     if (!deviceId) {
-      throw new BLEConfigError("多设备模式下必须提供设备ID");
+      throw new Error("多设备模式下必须提供设备ID");
     }
     await this.connectionManager.disconnectDevice(deviceId);
   }
@@ -64,11 +63,11 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 获取蓝牙设备信号强度
    * @param {string} deviceId 设备ID（必需）
-   * @throws {BLEAdapterError}
+   * @throws {Error}
    */
   async getDeviceRSSI(deviceId: string): Promise<number> {
     if (!deviceId) {
-      throw new BLEConfigError("多设备模式下必须提供设备ID");
+      throw new Error("多设备模式下必须提供设备ID");
     }
     return await this.adapterManager.getDeviceRSSI(deviceId);
   }
@@ -76,11 +75,11 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 获取蓝牙设备的所有服务
    * @param {string} deviceId 设备ID（必需）
-   * @throws {BLEServiceError}
+   * @throws {Error}
    */
   async getDeviceServices(deviceId: string): Promise<WechatMiniprogram.BLEService[]> {
     if (!deviceId) {
-      throw new BLEConfigError("多设备模式下必须提供设备ID");
+      throw new Error("多设备模式下必须提供设备ID");
     }
     return await this.serviceManager.getDeviceServices(deviceId);
   }
@@ -88,7 +87,7 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 启用蓝牙设备特征值变化的通知功能
    * @param {string} deviceId 设备ID（必需）
-   * @throws {BLEServiceError | BLEConfigError}
+   * @throws {Error}
    */
   async enableCharacteristicNotification(
     deviceId: string,
@@ -96,7 +95,7 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
     characteristicId?: string
   ): Promise<void> {
     if (!deviceId) {
-      throw new BLEConfigError("多设备模式下必须提供设备ID");
+      throw new Error("多设备模式下必须提供设备ID");
     }
     await this.serviceManager.enableCharacteristicNotification(
       deviceId,
@@ -108,11 +107,11 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 发送数据帧
    * @param {writeCharacteristicOption} options 写入选项（必须包含 deviceId）
-   * @throws {BLEIOError | BLETimeoutError | BLEConfigError}
+   * @throws {Error}
    */
   async writeCharacteristicValue(options: writeCharacteristicOption): Promise<any> {
     if (!options.deviceId) {
-      throw new BLEConfigError("多设备模式下必须提供设备ID");
+      throw new Error("多设备模式下必须提供设备ID");
     }
     return this.ioManager.writeCharacteristicValue(options, "multiple");
   }
@@ -120,11 +119,11 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 读取数据帧
    * @param {readCharacteristicOption} options 读取选项（必须包含 deviceId）
-   * @throws {BLEIOError | BLETimeoutError | BLEConfigError}
+   * @throws {Error}
    */
   async readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer> {
     if (!options.deviceId) {
-      throw new BLEConfigError("多设备模式下必须提供设备ID");
+      throw new Error("多设备模式下必须提供设备ID");
     }
     const result = await this.ioManager.readCharacteristicValue(options, "multiple");
     return result?.value || new ArrayBuffer(0);

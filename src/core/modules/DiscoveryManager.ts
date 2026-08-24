@@ -3,7 +3,6 @@
  * 负责搜索、发现、过滤蓝牙设备
  */
 import type { Device, SearchOption } from "../../types/ble";
-import { convertWxErrorToBLEError } from "../../utils/error";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 
 export class DiscoveryManager {
@@ -15,14 +14,11 @@ export class DiscoveryManager {
 
   // 存储多个设备发现的回调函数
   private deviceFoundCallbacks: Set<(devices: Device[]) => void> = new Set();
-  
+
   // 标记是否已经注册了平台的全局监听器（私有实现）
   private isDeviceFoundListenerRegistered = false;
 
-  constructor(
-    searchOption: SearchOption = {},
-    reconnect: boolean = false
-  ) {
+  constructor(searchOption: SearchOption = {}, reconnect: boolean = false) {
     this.searchOption = searchOption;
     this.reconnect = reconnect;
   }
@@ -48,14 +44,14 @@ export class DiscoveryManager {
    * 获取当前已找到的设备列表（深拷贝，防止外部修改）
    */
   get foundDevList(): Device[] {
-    return this._foundDevList.map(d => ({ ...d }));
+    return this._foundDevList.map((d) => ({ ...d }));
   }
 
   /**
    * 获取已找到的设备的历史列表（深拷贝，防止外部修改）
    */
   get historyDevList(): Device[] {
-    return this._historyDevList.map(d => ({ ...d }));
+    return this._historyDevList.map((d) => ({ ...d }));
   }
 
   /**
@@ -65,19 +61,29 @@ export class DiscoveryManager {
    * @returns {boolean} true 表示设备通过过滤条件
    */
   private isDeviceMatched(deviceName: string, localName?: string): boolean {
-    const name = deviceName || localName || '';
+    const name = deviceName || localName || "";
     if (!name) return false;
 
     // 检查黑名单：如果设备名包含任何排除关键字，则过滤掉
-    if (this.searchOption.excludeKeys && this.searchOption.excludeKeys.length > 0) {
-      if (this.searchOption.excludeKeys.some((key: string) => name.includes(key))) {
+    if (
+      this.searchOption.excludeKeys &&
+      this.searchOption.excludeKeys.length > 0
+    ) {
+      if (
+        this.searchOption.excludeKeys.some((key: string) => name.includes(key))
+      ) {
         return false;
       }
     }
 
     // 检查白名单：如果配置了，设备名必须包含其中至少一个
-    if (this.searchOption.includeKeys && this.searchOption.includeKeys.length > 0) {
-      return this.searchOption.includeKeys.some((key: string) => name.includes(key));
+    if (
+      this.searchOption.includeKeys &&
+      this.searchOption.includeKeys.length > 0
+    ) {
+      return this.searchOption.includeKeys.some((key: string) =>
+        name.includes(key),
+      );
     }
 
     // 如果没有配置任何过滤，接受所有设备
@@ -87,11 +93,11 @@ export class DiscoveryManager {
   /**
    * 开始搜索蓝牙设备?
    * @returns {Promise<any>} 结果
-   * @throws {BLEError} 搜索失败
+   * @throws {Error} 搜索失败
    */
   async startDeviceDiscovery(
     searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this
-      .searchOption
+      .searchOption,
   ) {
     try {
       console.log(`准备搜寻附近的蓝牙外围设备...`);
@@ -152,7 +158,7 @@ export class DiscoveryManager {
 
       // 先进行过滤，然后再转换设备信息
       const filteredDevices = res.devices.filter((device) =>
-        this.isDeviceMatched(device.name, device.localName)
+        this.isDeviceMatched(device.name, device.localName),
       );
 
       const realTimeDevices = filteredDevices.map((device) => ({
@@ -220,7 +226,7 @@ export class DiscoveryManager {
   /**
    * 停止搜索蓝牙设备
    * @returns {Promise<any>} 结果
-   * @throws {BLEError} 停止失败
+   * @throws {Error} 停止失败
    */
   async stopDeviceDiscovery() {
     try {
@@ -235,8 +241,7 @@ export class DiscoveryManager {
       return res;
     } catch (err) {
       console.error(`停止查询设备失败！`, err);
-      throw convertWxErrorToBLEError(err);
+      throw err;
     }
   }
 }
-

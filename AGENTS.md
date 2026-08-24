@@ -43,7 +43,8 @@ src/
 ├── types/
 │   └── ble.d.ts                      # 所有类型定义
 └── utils/
-    └── error.ts                      # 9 个自定义异常类
+    ├── runtime.ts                    # 运行时环境判断（鸿蒙/devtools 跳过 BLE API）
+    └── uuid.ts                       # UUID 工具（短 UUID → 128 位标准转换）
 `
 
 > ⚠️ BluetoothManager.ts **不存在**。旧文档中的该文件已在重构时移除。
@@ -103,33 +104,25 @@ interface readCharacteristicOption extends WechatMiniprogram.ReadBLECharacterist
 
 ---
 
-## 错误处理（src/utils/error.ts）
+## 错误处理
+
+> ⚠️ error.ts（9 个自定义异常类）已在 0.3.0 移除。当前**不抛出自定义错误类型**。
 
 所有方法**抛出异常**，不返回 [err, result] 元组。调用方需 try/catch：
+
+- **微信原生 API 调用失败** → 直接 `throw err`（原始微信错误对象，含 `errMsg`、`errno` / `errCode`）
+- **参数校验 / 配置校验 / 超时** → `throw new Error("...")`（原生 Error，超时消息含 "超时" 字样）
 
 `	Typescript
 try {
   await ble.connectDevice(device);
 } catch (err) {
-  if (err instanceof BLEConnectionError) { /* ... */ }
+  if (err?.errno === 103 || err?.errCode === 103) { /* 权限未授权 */ }
+  else if (err?.errMsg?.includes('timeout')) { /* 超时 */ }
 }
 `
 
-**9 个自定义异常类**（均继承 BLEError extends Error）：
-
-| 类 | 额外字段 | code |
-|---|---|---|
-| BLEError | code, originalError | "UNKNOWN" |
-| BLEAdapterError | — | "ADAPTER_ERROR" |
-| BLEPermissionError | — | "PERMISSION_DENIED" |
-| BLEConnectionError | deviceId? | "CONNECTION_ERROR" |
-| BLETimeoutError | operation, timeoutMs | "TIMEOUT" |
-| BLEDeviceNotFoundError | deviceId? | "DEVICE_NOT_FOUND" |
-| BLEServiceError | serviceId?, characteristicId? | "SERVICE_ERROR" |
-| BLEConfigError | — | "CONFIG_ERROR" |
-| BLEIOError | operation: "read"|"write", deviceId?, characteristicId? | "IO_ERROR" |
-
-辅助函数：formatError(err), convertWxErrorToBLEError(err): BLEError
+**不要**在 Manager 内再包装自定义异常。判断错误类型时读取微信错误字段（errMsg / errno / errCode），不要用 instanceof。
 
 ---
 
@@ -254,10 +247,6 @@ export { SingleDeviceBLEHandler as BLEHandler }  // 向后兼容
 | [doc/archive/ARCHITECTURE.md](./doc/archive/ARCHITECTURE.md) | 架构设计与设计模式 |
 | [doc/archive/DEVICE_FILTER_GUIDE.md](./doc/archive/DEVICE_FILTER_GUIDE.md) | 设备过滤详细指南 |
 | [doc/archive/RENAME.md](./doc/archive/RENAME.md) | 旧 API 新 API 迁移对照 |
-| [CHANGELOG.md](./CHANGELOG.md) | 版本变更记录 |
+| [change-log](./change-log/*) | 版本变更记录 |
 
 ---
-
-**最后更新**: 2026-05-09  
-**文档版本**: 4.0  
-**对应代码版本**: 0.2.0

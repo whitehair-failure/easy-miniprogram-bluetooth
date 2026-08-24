@@ -149,7 +149,7 @@ await handler.readCharacteristicValue({ deviceId })  // 需要 deviceId
 
 ### Q: 如何处理蓝牙错误？
 **A**: 
-1. 查看 [EXAMPLES.md#错误处理](./EXAMPLES.md#错误处理) 的异常类型说明
+1. 查看 [EXAMPLES.md#错误处理](./EXAMPLES.md#错误处理) 的错误处理说明（库不抛自定义异常，直接透传微信原生错误）
 2. 参考 [EXAMPLES.md#完整错误处理示例](./EXAMPLES.md#完整错误处理示例)
 
 ### Q: 如何过滤蓝牙设备？

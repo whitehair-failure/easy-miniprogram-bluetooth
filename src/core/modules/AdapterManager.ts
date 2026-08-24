@@ -2,34 +2,13 @@
  * AdapterManager - 蓝牙适配器管理模块
  * 负责适配器的初始化、状态检查、关闭等操作
  */
-import { BLEAdapterError, BLEPermissionError, BLETimeoutError, convertWxErrorToBLEError } from "../../utils/error";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 
 export class AdapterManager {
   /**
-   * 超时控制 Promise
-   * @param promise 原始 Promise
-   * @param timeout 超时时间（默认 6000ms）
-   */
-  withTimeout<T>(promise: Promise<T>, timeout = 6000): Promise<T> {
-    let timeoutId: number;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new BLETimeoutError("操作超时", "adapter", timeout)), timeout);
-    });
-
-    // 保证清理定时器
-    return Promise.race([
-      Promise.resolve(promise).finally(() => clearTimeout(timeoutId)),
-      timeoutPromise,
-    ]);
-  }
-
-  /**
    * 检查蓝牙开启状态和权限授予状态
    * @returns {Promise<any>} 检查结果
-   * @throws {BLEPermissionError} 权限未授予
-   * @throws {BLEAdapterError} 蓝牙未开启或其他适配器错误
+   * @throws {Error} 权限未授予或蓝牙未开启等其他适配器错误
    */
   async getAdapterStatus() {
     try {
@@ -44,21 +23,21 @@ export class AdapterManager {
       console.log(`✔ 适配器状态获取成功！`);
       return res;
     } catch (err: any) {
-      // 如果获取适配器状态失败，提示用户检查权限或蓝牙状态
       if (err?.errno === 103 || err?.errCode === 103) {
-        throw new BLEPermissionError("请检查是否已授权小程序蓝牙权限", 103, err);
+        throw new Error("请检查是否已授权小程序蓝牙权限");
       }
       if (err?.errno === 1500102 || err?.errCode === 10001) {
-        throw new BLEAdapterError("请检查蓝牙是否开启", err?.errno || err?.errCode, err);
+        throw new Error("请检查蓝牙是否开启");
       }
-      throw convertWxErrorToBLEError(err);
+      // 如果获取适配器状态失败，直接抛出原始错误，由调用方判断权限或蓝牙状态
+      throw err;
     }
   }
 
   /**
    * 初始化并打开蓝牙适配器
    * @returns {Promise<any>} 结果
-   * @throws {BLEAdapterError} 适配器错误
+   * @throws {Error} 适配器错误
    */
   async openAdapter() {
     try {
@@ -71,14 +50,14 @@ export class AdapterManager {
       return res;
     } catch (err) {
       console.error(`✘ 初始化失败！`, err);
-      throw convertWxErrorToBLEError(err);
+      throw err;
     }
   }
 
   /**
    * 关闭蓝牙适配器
    * @returns {Promise<any>} 结果
-   * @throws {BLEAdapterError} 适配器错误
+   * @throws {Error} 适配器错误
    */
   async closeAdapter() {
     try {
@@ -91,7 +70,7 @@ export class AdapterManager {
       return res;
     } catch (err) {
       console.error(`✘ 释放适配器失败！`, err);
-      throw convertWxErrorToBLEError(err);
+      throw err;
     }
   }
 
@@ -99,7 +78,7 @@ export class AdapterManager {
    * 获取蓝牙设备信号强度
    * @param {string} deviceId 设备ID
    * @returns {Promise<any>} RSSI 结果
-   * @throws {BLEError} 获取失败
+   * @throws {Error} 获取失败
    */
   async getDeviceRSSI(deviceId: string): Promise<any> {
     try {
@@ -111,7 +90,7 @@ export class AdapterManager {
       return res;
     } catch (err: any) {
       console.error(`✘ 获取信号强度失败！${err}`);
-      throw convertWxErrorToBLEError(err);
+      throw err;
     }
   }
 }
