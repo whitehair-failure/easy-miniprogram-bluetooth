@@ -111,7 +111,8 @@ export abstract class BLEHandlerBase {
     this.searchOption = options.searchOption || {};
 
     // 初始化各个管理器
-    // 注意：使用同一个 config 对象引用，确保 ServiceManager 和 IOManager 共享同一份配置
+    // 注意：ServiceManager 与 IOManager 各自持有经 UUID 转换后的 config 副本；
+    // updateBLEHandlerConfig 会同步更新两者，保持一致性
     const config = options.config ?? {};
     this.adapterManager = new AdapterManager();
     this.discoveryManager = new DiscoveryManager(this.searchOption, this.reconnect);
@@ -150,10 +151,11 @@ export abstract class BLEHandlerBase {
   async updateBLEHandlerConfig(cfg: Partial<BLEHandlerConfig>): Promise<BLEHandlerConfig> {
     this.ioManager.setBLEHandlerConfig(cfg);
     const result = this.serviceManager.setBLEHandlerConfig(cfg);
-    // 配置更新后重新订阅通知（仅当已连接设备时）
-    const deviceId = this.singleConnectedDevice?.deviceId;
-    if (deviceId) {
-      await this.enableCharacteristicNotification(deviceId);
+    // 配置更新后重新订阅通知（遍历所有已连接设备，多设备模式下也全部生效）
+    for (const dev of this.connectedDevices) {
+      if (dev?.deviceId) {
+        await this.enableCharacteristicNotification(dev.deviceId);
+      }
     }
     return result;
   }

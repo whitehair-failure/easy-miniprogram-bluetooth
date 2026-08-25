@@ -219,7 +219,7 @@ export class ConnectionManager {
       try {
         console.log(`开始第 ${retryCount + 1} 次重连..`);
 
-        // 等待重连延时
+        // 等待重连延时(连接超时时间+重连延时)，以避免频繁重连导致的资源占用和冲突
         await new Promise((resolve) =>
           setTimeout(resolve, this.connectTimeout + this.reconnectDelay),
         );

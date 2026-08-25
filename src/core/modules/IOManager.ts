@@ -9,6 +9,7 @@ import type {
 } from "../../types/ble";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 import { convertConfigUUIDs } from "../../utils/uuid";
+import { validateBLEHandlerConfig } from "../../utils/config";
 
 export class IOManager {
   // 请求队列：存储待响应的请求信息，用于精确匹配
@@ -37,40 +38,8 @@ export class IOManager {
   constructor(config: BLEHandlerConfig) {
     // 自动将短UUID转换为标准128位UUID
     const convertedConfig = convertConfigUUIDs(config);
+    validateBLEHandlerConfig(convertedConfig);
     this.config = convertedConfig;
-  }
-
-  /**
-   * 验证配置有效性
-   * @throws {Error}
-   */
-  private validateConfig(config: BLEHandlerConfig): void {
-    if (!config) {
-      throw new Error("BLEHandlerConfig is required");
-    }
-
-    // serviceUId 现在是可选的，仅当提供时进行验证
-    if (
-      config.serviceUId !== undefined &&
-      (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")
-    ) {
-      throw new Error("serviceUId must be a non-empty string or undefined");
-    }
-
-    // 验证特征值 ID（如果提供）
-    const characteristicIds = [
-      config.readCharacteristicId,
-      config.writeCharacteristicId,
-      config.notifyCharacteristicId,
-    ];
-
-    for (const id of characteristicIds) {
-      if (id !== undefined && (typeof id !== "string" || id.trim() === "")) {
-        throw new Error(
-          `Invalid characteristic ID: ${id}. Must be a non-empty string or undefined`,
-        );
-      }
-    }
   }
 
   /**
@@ -106,7 +75,7 @@ export class IOManager {
 
     // 创建新配置对象进行验证
     const newConfig = { ...this.config, ...convertedCfg };
-    this.validateConfig(newConfig);
+    validateBLEHandlerConfig(newConfig);
 
     // 验证通过后，更新配置
     if (convertedCfg.serviceUId) this.config.serviceUId = convertedCfg.serviceUId;
@@ -435,7 +404,7 @@ export class IOManager {
         deviceId: targetDeviceId,
         serviceId: serviceIdFinal,
         characteristicId: characteristicIdFinal,
-        value: new ArrayBuffer(0),
+        value: [0], // 返回一个默认的 ArrayBuffer（Uint8Array）表示空数据
       };
     }
 
