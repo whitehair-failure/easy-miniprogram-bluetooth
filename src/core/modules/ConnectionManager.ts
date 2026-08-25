@@ -3,7 +3,7 @@
  * 负责设备连接、断开、重连、状态监听。
  */
 import type { Device } from "../../types/ble";
-import { isHarmonyOS, shouldSkipBLEApiCall } from "../../utils/runtime";
+import { shouldSkipBLEApiCall } from "../../utils/runtime";
 
 export class ConnectionManager {
   private _connectedDevices: Device[] = []; // 已连接的设备列表（私有）
@@ -63,9 +63,7 @@ export class ConnectionManager {
    * 获取当前连接的设备（单设备模式，深拷贝）
    */
   get singleConnectedDevice(): Device | undefined {
-    return this._connectedDevices[0]
-      ? { ...this._connectedDevices[0] }
-      : undefined;
+    return this._connectedDevices[0] ? { ...this._connectedDevices[0] } : undefined;
   }
 
   /**
@@ -163,18 +161,14 @@ export class ConnectionManager {
         this.activeTargetDeviceId = dev.deviceId;
         this.cancelReconnectsExcept(dev.deviceId);
       } else {
-        let index = this._connectedDevices.findIndex(
-          (d) => d.deviceId === dev.deviceId,
-        );
+        const index = this._connectedDevices.findIndex((d) => d.deviceId === dev.deviceId);
         if (index === -1) {
           this._connectedDevices.push(dev);
         }
       }
 
       // 添加历史上已连接过的设备到列表
-      let index = this._historyConnectedDevices.findIndex(
-        (d) => d.deviceId === dev.deviceId,
-      );
+      const index = this._historyConnectedDevices.findIndex((d) => d.deviceId === dev.deviceId);
       if (index === -1) {
         this._historyConnectedDevices.push(dev);
       }
@@ -202,9 +196,7 @@ export class ConnectionManager {
     const maxRetries = this.maxRetries;
     let retryCount = 0;
     // 捕获开始时的重连“代次”，若期间被取消则终止循环
-    const localGeneration = this.getReconnectGenerationForDevice(
-      device.deviceId,
-    );
+    const localGeneration = this.getReconnectGenerationForDevice(device.deviceId);
 
     while (retryCount < maxRetries) {
       // 若在单设备模式下，且当前用户指定的目标设备并非该设备，则立即停止该设备的重连
@@ -220,13 +212,8 @@ export class ConnectionManager {
       }
 
       // 若重连代次发生变化，说明被取消了
-      if (
-        localGeneration !==
-        this.getReconnectGenerationForDevice(device.deviceId)
-      ) {
-        console.log(
-          `设备 ${device.name}(${device.deviceId}) 重连已被取消（generation 变化）`,
-        );
+      if (localGeneration !== this.getReconnectGenerationForDevice(device.deviceId)) {
+        console.log(`设备 ${device.name}(${device.deviceId}) 重连已被取消（generation 变化）`);
         return false;
       }
       try {
@@ -248,10 +235,7 @@ export class ConnectionManager {
           );
           return false;
         }
-        if (
-          localGeneration !==
-          this.getReconnectGenerationForDevice(device.deviceId)
-        ) {
+        if (localGeneration !== this.getReconnectGenerationForDevice(device.deviceId)) {
           console.log(
             `设备 ${device.name}(${device.deviceId}) 重连在延时后被取消（generation 变化）`,
           );
@@ -279,9 +263,7 @@ export class ConnectionManager {
       }
     }
 
-    console.error(
-      `设备 ${device.name}(${device.deviceId}) 重连失败,已达到最大重试次数`,
-    );
+    console.error(`设备 ${device.name}(${device.deviceId}) 重连失败,已达到最大重试次数`);
     return false;
   }
 
@@ -289,9 +271,7 @@ export class ConnectionManager {
    * 蓝牙适配器连接状态监听（全局只注册一次 wx 监听器）
    * @param onReconnect 连接异常断开时的重连回调
    */
-  ensureConnectionStateListenerRegistered(
-    onReconnect: (device: Device) => Promise<void>,
-  ): void {
+  ensureConnectionStateListenerRegistered(onReconnect: (device: Device) => Promise<void>): void {
     this._onReconnect = onReconnect;
 
     if (this.isConnectionStateListenerRegistered) {
@@ -308,9 +288,7 @@ export class ConnectionManager {
 
       // 自动重连
       if (!res.connected) {
-        let index = this._connectedDevices.findIndex(
-          (d) => d.deviceId === res.deviceId,
-        );
+        const index = this._connectedDevices.findIndex((d) => d.deviceId === res.deviceId);
 
         if (index === -1) {
           console.warn(`Device ${res.deviceId} not found in connected list`);
@@ -333,10 +311,7 @@ export class ConnectionManager {
             // 明确取消该设备的任何在进行中的重连任务
             this.cancelReconnectForDevice(device.deviceId);
           } else {
-            const success = await this.attemptReconnect(
-              device,
-              this._onReconnect,
-            );
+            const success = await this.attemptReconnect(device, this._onReconnect);
             if (!success) {
               // 重连失败,从已连接列表中移除
               this._connectedDevices.splice(index, 1);
@@ -377,9 +352,7 @@ export class ConnectionManager {
                 this._connectedDevices.push(deviceFromHistory);
               } else {
                 // 这是一个未知的、不在历史记录中的设备，强制断开
-                console.warn(
-                  `发现未知设备自动重连: ${res.deviceId}，将强制断开。`,
-                );
+                console.warn(`发现未知设备自动重连: ${res.deviceId}，将强制断开。`);
                 await this.disconnectDevice(res.deviceId);
               }
             }
@@ -405,9 +378,7 @@ export class ConnectionManager {
    * @returns {function} 解绑函数
    */
   addConnectionStateChangeListener(
-    callback: (
-      res: WechatMiniprogram.OnBLEConnectionStateChangeListenerResult,
-    ) => void,
+    callback: (res: WechatMiniprogram.OnBLEConnectionStateChangeListenerResult) => void,
   ): () => void {
     this.connectionStateCallbacks.add(callback);
     return () => {
@@ -434,9 +405,7 @@ export class ConnectionManager {
       throw new Error("必须提供设备ID");
     }
 
-    let index = this._connectedDevices.findIndex(
-      (d) => d.deviceId === deviceId,
-    );
+    const index = this._connectedDevices.findIndex((d) => d.deviceId === deviceId);
 
     if (index !== -1) {
       this._connectedDevices[index].reconnect = false; // 取消自动连接
@@ -460,9 +429,7 @@ export class ConnectionManager {
       }
     } else {
       // 多设备模式：从已连接列表中移除该设备
-      this._connectedDevices = this._connectedDevices.filter(
-        (d) => d.deviceId !== deviceId,
-      );
+      this._connectedDevices = this._connectedDevices.filter((d) => d.deviceId !== deviceId);
     }
   }
 }

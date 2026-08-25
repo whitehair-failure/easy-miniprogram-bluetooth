@@ -33,9 +33,6 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
    * @throws {Error}
    */
   async connectDevice(devOrDeviceId: Device | string): Promise<void> {
-    // 解析设备ID
-    const deviceId = typeof devOrDeviceId === "string" ? devOrDeviceId : devOrDeviceId.deviceId;
-
     await this.connectionManager.connectDevice(
       devOrDeviceId,
       this.connectTimeout,
@@ -44,7 +41,7 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
         await this.getDeviceServices(connectedDeviceId);
         await this.validateCharacteristics(connectedDeviceId);
         await this.enableCharacteristicNotification(connectedDeviceId);
-      }
+      },
     );
   }
 
@@ -92,7 +89,7 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   async enableCharacteristicNotification(
     deviceId: string,
     serviceId?: string,
-    characteristicId?: string
+    characteristicId?: string,
   ): Promise<void> {
     if (!deviceId) {
       throw new Error("多设备模式下必须提供设备ID");
@@ -100,7 +97,7 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
     await this.serviceManager.enableCharacteristicNotification(
       deviceId,
       serviceId,
-      characteristicId
+      characteristicId,
     );
   }
 

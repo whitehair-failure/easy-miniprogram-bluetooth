@@ -105,9 +105,7 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
    * 发送数据帧
    * @throws {Error}
    */
-  async writeCharacteristicValue(
-    options: writeCharacteristicOption,
-  ): Promise<any> {
+  async writeCharacteristicValue(options: writeCharacteristicOption): Promise<any> {
     return this.ioManager.writeCharacteristicValue(
       options,
       "single",
@@ -119,9 +117,7 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
    * 读取数据帧
    * @throws {Error}
    */
-  async readCharacteristicValue(
-    options: readCharacteristicOption,
-  ): Promise<ArrayBuffer> {
+  async readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer> {
     const result = await this.ioManager.readCharacteristicValue(
       options,
       "single",

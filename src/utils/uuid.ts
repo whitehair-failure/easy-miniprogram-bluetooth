@@ -25,7 +25,7 @@ export function convertShortUUIDToFull(shortUuid: string): string {
   if (!shortUuid || typeof shortUuid !== "string") return shortUuid;
 
   const cleanUuid = shortUuid.trim().toUpperCase();
-  
+
   if (!isShortUUID(cleanUuid)) {
     // 如果不是短UUID，直接返回原值
     return shortUuid;
@@ -43,7 +43,12 @@ export function convertConfigUUIDs(config: any): any {
   if (!config || typeof config !== "object") return config;
 
   // UUID相关的字段名
-  const uuidFields = ["serviceUId", "readCharacteristicId", "writeCharacteristicId", "notifyCharacteristicId"];
+  const uuidFields = [
+    "serviceUId",
+    "readCharacteristicId",
+    "writeCharacteristicId",
+    "notifyCharacteristicId",
+  ];
 
   const converted = { ...config };
 

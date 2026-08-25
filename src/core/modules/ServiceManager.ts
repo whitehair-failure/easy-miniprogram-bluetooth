@@ -2,10 +2,7 @@
  * ServiceManager - 服务与特征值管理模块
  * 负责获取服务、检查特征值、订阅通知
  */
-import type {
-  BLEHandlerConfig,
-  CharacteristicCheckResult,
-} from "../../types/ble";
+import type { BLEHandlerConfig, CharacteristicCheckResult } from "../../types/ble";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 import { convertConfigUUIDs } from "../../utils/uuid";
 
@@ -29,7 +26,10 @@ export class ServiceManager {
     }
 
     // serviceUId 现在是可选的，仅当提供时进行验证
-    if (config.serviceUId !== undefined && (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")) {
+    if (
+      config.serviceUId !== undefined &&
+      (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")
+    ) {
       throw new Error("serviceUId must be a non-empty string or undefined");
     }
 
@@ -43,7 +43,7 @@ export class ServiceManager {
     for (const id of characteristicIds) {
       if (id !== undefined && (typeof id !== "string" || id.trim() === "")) {
         throw new Error(
-          `Invalid characteristic ID: ${id}. Must be a non-empty string or undefined`
+          `Invalid characteristic ID: ${id}. Must be a non-empty string or undefined`,
         );
       }
     }
@@ -54,9 +54,7 @@ export class ServiceManager {
    * 接受部分配置项：serviceUId / writeCharacteristicId / notifyCharacteristicId
    * @throws {Error}
    */
-  setBLEHandlerConfig(
-    cfg: Partial<BLEHandlerConfig>
-  ): BLEHandlerConfig {
+  setBLEHandlerConfig(cfg: Partial<BLEHandlerConfig>): BLEHandlerConfig {
     if (!cfg || typeof cfg !== "object") {
       throw new Error("Invalid config object");
     }
@@ -121,7 +119,7 @@ export class ServiceManager {
    */
   async validateCharacteristics(
     deviceId: string,
-    serviceId?: string
+    serviceId?: string,
   ): Promise<CharacteristicCheckResult> {
     // 如果未配置 serviceUId 且未提供 serviceId，跳过验证
     if (!this.config.serviceUId && !serviceId) {
@@ -136,7 +134,7 @@ export class ServiceManager {
     console.log(`开始获取特征值...`);
     const res = await wx.getBLEDeviceCharacteristics({
       deviceId,
-      serviceId: serviceId || this.config.serviceUId || ""
+      serviceId: serviceId || this.config.serviceUId || "",
     });
     console.log(`✔ 获取特征值成功！`, res);
 
@@ -146,9 +144,7 @@ export class ServiceManager {
     // 检查写特征值（只有配置了才检查）
     if (
       this.config.writeCharacteristicId &&
-      !res?.characteristics.some(
-        (c: any) => c.uuid === this.config.writeCharacteristicId
-      )
+      !res?.characteristics.some((c: any) => c.uuid === this.config.writeCharacteristicId)
     ) {
       missingCharacteristics.push("writeCharacteristicId");
     }
@@ -156,9 +152,7 @@ export class ServiceManager {
     // 检查通知特征值（只有配置了才检查）
     if (
       this.config.notifyCharacteristicId &&
-      !res?.characteristics.some(
-        (c: any) => c.uuid === this.config.notifyCharacteristicId
-      )
+      !res?.characteristics.some((c: any) => c.uuid === this.config.notifyCharacteristicId)
     ) {
       missingCharacteristics.push("notifyCharacteristicId");
     }
@@ -166,9 +160,7 @@ export class ServiceManager {
     // 检查读特征值（只有配置了才检查）
     if (
       this.config.readCharacteristicId &&
-      !res?.characteristics.some(
-        (c: any) => c.uuid === this.config.readCharacteristicId
-      )
+      !res?.characteristics.some((c: any) => c.uuid === this.config.readCharacteristicId)
     ) {
       missingCharacteristics.push("readCharacteristicId");
     }
@@ -200,7 +192,7 @@ export class ServiceManager {
   async enableCharacteristicNotification(
     deviceId: string,
     serviceId?: string,
-    characteristicId?: string
+    characteristicId?: string,
   ): Promise<void> {
     if (!deviceId) {
       throw new Error("必须提供设备ID");
@@ -229,7 +221,7 @@ export class ServiceManager {
       serviceId: serviceId || this.config.serviceUId || "",
       characteristicId: characteristicId || this.config.notifyCharacteristicId || "",
       state: true,
-      type: this.config.notifyType || "notification"
+      type: this.config.notifyType || "notification",
     });
     console.log(`✔ 订阅特征值成功！`);
   }

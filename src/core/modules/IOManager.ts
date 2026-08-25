@@ -26,9 +26,7 @@ export class IOManager {
 
   // 存储多个特征值变化的回调函数
   private characteristicValueChangeCallbacks: Set<
-    (
-      result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult,
-    ) => void
+    (result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult) => void
   > = new Set();
 
   // 标记是否已经注册了平台的全局监听器（私有实现）
@@ -56,9 +54,7 @@ export class IOManager {
       config.serviceUId !== undefined &&
       (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")
     ) {
-      throw new Error(
-        "serviceUId must be a non-empty string or undefined",
-      );
+      throw new Error("serviceUId must be a non-empty string or undefined");
     }
 
     // 验证特征值 ID（如果提供）
@@ -113,8 +109,7 @@ export class IOManager {
     this.validateConfig(newConfig);
 
     // 验证通过后，更新配置
-    if (convertedCfg.serviceUId)
-      this.config.serviceUId = convertedCfg.serviceUId;
+    if (convertedCfg.serviceUId) this.config.serviceUId = convertedCfg.serviceUId;
     if (convertedCfg.writeCharacteristicId)
       this.config.writeCharacteristicId = convertedCfg.writeCharacteristicId;
     if (convertedCfg.notifyCharacteristicId)
@@ -142,7 +137,7 @@ export class IOManager {
       // 将 ArrayBuffer 转换为 Uint8Array，方便处理二进制数据
       const buffer = new Uint8Array(res.value);
 
-      let newRes = {
+      const newRes = {
         deviceId: res.deviceId,
         serviceId: res.serviceId,
         characteristicId: res.characteristicId,
@@ -209,9 +204,7 @@ export class IOManager {
    * @returns {function} 返回一个用于取消该回调的函数
    */
   addCharacteristicValueChangeListener(
-    callback: (
-      result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult,
-    ) => void,
+    callback: (result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult) => void,
   ): () => void {
     // 确保平台的全局监听器已注册
     this.ensureCharacteristicListenerRegistered();
@@ -233,9 +226,7 @@ export class IOManager {
    * @returns {boolean} 是否成功删除
    */
   removeCharacteristicValueChangeListener(
-    callback: (
-      result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult,
-    ) => void,
+    callback: (result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult) => void,
   ): boolean {
     return this.characteristicValueChangeCallbacks.delete(callback);
   }
@@ -288,7 +279,6 @@ export class IOManager {
     // 从 responseConfig 中读取响应匹配相关配置
     const hasResponse = responseConfig?.hasResponse;
     const timeoutMs = responseConfig?.timeoutMs;
-    const respServiceId = responseConfig?.serviceId;
     const respCharacteristicId = responseConfig?.characteristicId;
 
     let targetDeviceId: string | undefined;
@@ -309,13 +299,10 @@ export class IOManager {
 
     // 写入操作使用的 serviceId/characteristicId（来自 WriteBLECharacteristicValueOption 顶层字段）
     const writeServiceIdFinal = writeServiceId || this.config.serviceUId || "";
-    const writeCharIdFinal =
-      writeCharId || this.config.writeCharacteristicId || "";
+    const writeCharIdFinal = writeCharId || this.config.writeCharacteristicId || "";
 
-    // pendingRequests 响应匹配使用的 serviceId/characteristicId（来自 responseConfig，默认使用 config 中配置的参数）
-    const respServiceIdFinal = respServiceId || this.config.serviceUId || "";
-    const respCharIdFinal =
-      respCharacteristicId || this.config.notifyCharacteristicId || "";
+    // pendingRequests 响应匹配使用的 characteristicId（来自 responseConfig，默认使用 config 中配置的参数）
+    const respCharIdFinal = respCharacteristicId || this.config.notifyCharacteristicId || "";
 
     if (shouldSkipBLEApiCall("writeBLECharacteristicValue")) {
       return { success: true };
@@ -327,7 +314,7 @@ export class IOManager {
       // 生成一个唯一的请求ID
       const requestId = `req_${this.requestCounter++}`;
 
-      return new Promise<any>(async (resolve, reject) => {
+      return new Promise<any>((resolve, reject) => {
         const cleanup = () => {
           const request = this.pendingRequests.get(requestId);
           if (request?.timeoutId) {
@@ -366,45 +353,42 @@ export class IOManager {
           `发送写入请求 - 请求ID: ${requestId}, 设备: ${targetDeviceId}, 服务: ${writeServiceIdFinal}, 特征值: ${writeCharIdFinal}`,
         );
 
-        try {
-          const WriteBLECharacteristicValueOption =
-            {} as WechatMiniprogram.WriteBLECharacteristicValueOption;
-          WriteBLECharacteristicValueOption.deviceId = targetDeviceId;
-          WriteBLECharacteristicValueOption.serviceId = writeServiceIdFinal;
-          WriteBLECharacteristicValueOption.characteristicId = writeCharIdFinal;
-          WriteBLECharacteristicValueOption.value = frame;
-          writeType
-            ? (WriteBLECharacteristicValueOption.writeType = writeType)
-            : null;
+        // 发起底层写入（异步，避免 async executor 反模式）
+        void (async () => {
+          try {
+            const WriteBLECharacteristicValueOption =
+              {} as WechatMiniprogram.WriteBLECharacteristicValueOption;
+            WriteBLECharacteristicValueOption.deviceId = targetDeviceId;
+            WriteBLECharacteristicValueOption.serviceId = writeServiceIdFinal;
+            WriteBLECharacteristicValueOption.characteristicId = writeCharIdFinal;
+            WriteBLECharacteristicValueOption.value = frame;
+            if (writeType) {
+              WriteBLECharacteristicValueOption.writeType = writeType;
+            }
 
-          await wx.writeBLECharacteristicValue(
-            WriteBLECharacteristicValueOption,
-          );
-          console.log(`✔ 写入数据成功 - 请求ID: ${requestId}`);
-          // 等待设备响应（通过特征值变化事件）
-        } catch (error) {
-          cleanup();
-          reject(error);
-        }
+            await wx.writeBLECharacteristicValue(WriteBLECharacteristicValueOption);
+            console.log(`✔ 写入数据成功 - 请求ID: ${requestId}`);
+            // 等待设备响应（通过特征值变化事件）
+          } catch (error) {
+            cleanup();
+            reject(error);
+          }
+        })();
       });
     } else {
-      try {
-        const WriteBLECharacteristicValueOption =
-          {} as WechatMiniprogram.WriteBLECharacteristicValueOption;
-        WriteBLECharacteristicValueOption.deviceId = targetDeviceId;
-        WriteBLECharacteristicValueOption.serviceId = writeServiceIdFinal;
-        WriteBLECharacteristicValueOption.characteristicId = writeCharIdFinal;
-        WriteBLECharacteristicValueOption.value = frame;
-        writeType
-          ? (WriteBLECharacteristicValueOption.writeType = writeType)
-          : null;
-
-        await wx.writeBLECharacteristicValue(WriteBLECharacteristicValueOption);
-        console.log(`✔ 写入数据成功（无需响应）`);
-        return { success: true };
-      } catch (error) {
-        throw error;
+      const WriteBLECharacteristicValueOption =
+        {} as WechatMiniprogram.WriteBLECharacteristicValueOption;
+      WriteBLECharacteristicValueOption.deviceId = targetDeviceId;
+      WriteBLECharacteristicValueOption.serviceId = writeServiceIdFinal;
+      WriteBLECharacteristicValueOption.characteristicId = writeCharIdFinal;
+      WriteBLECharacteristicValueOption.value = frame;
+      if (writeType) {
+        WriteBLECharacteristicValueOption.writeType = writeType;
       }
+
+      await wx.writeBLECharacteristicValue(WriteBLECharacteristicValueOption);
+      console.log(`✔ 写入数据成功（无需响应）`);
+      return { success: true };
     }
   }
 
@@ -425,12 +409,7 @@ export class IOManager {
     mode: "single" | "multiple",
     connectedSingleDeviceId?: string,
   ): Promise<any> {
-    const {
-      deviceId: optDeviceId,
-      timeoutMs,
-      serviceId,
-      characteristicId,
-    } = options;
+    const { deviceId: optDeviceId, timeoutMs, serviceId, characteristicId } = options;
 
     let targetDeviceId: string | undefined;
 
@@ -449,8 +428,7 @@ export class IOManager {
     }
 
     const serviceIdFinal = serviceId || this.config.serviceUId || "";
-    const characteristicIdFinal =
-      characteristicId || this.config.readCharacteristicId || "";
+    const characteristicIdFinal = characteristicId || this.config.readCharacteristicId || "";
 
     if (shouldSkipBLEApiCall("readBLECharacteristicValue")) {
       return {
@@ -464,7 +442,7 @@ export class IOManager {
     // 生成一个唯一的请求ID
     const requestId = `req_${this.requestCounter++}`;
 
-    return new Promise<any>(async (resolve, reject) => {
+    return new Promise<any>((resolve, reject) => {
       const cleanup = () => {
         const request = this.pendingRequests.get(requestId);
         if (request?.timeoutId) {
@@ -498,18 +476,21 @@ export class IOManager {
         timeoutId,
       });
 
-      try {
-        await wx.readBLECharacteristicValue({
-          deviceId: targetDeviceId,
-          serviceId: serviceIdFinal,
-          characteristicId: characteristicIdFinal,
-        });
-        console.log(`✔ 读取数据成功 - 请求ID: ${requestId}`);
-        // 等待设备通过特征值变化事件返回数据
-      } catch (error) {
-        cleanup();
-        reject(error);
-      }
+      // 发起底层读取（异步，避免 async executor 反模式）
+      void (async () => {
+        try {
+          await wx.readBLECharacteristicValue({
+            deviceId: targetDeviceId,
+            serviceId: serviceIdFinal,
+            characteristicId: characteristicIdFinal,
+          });
+          console.log(`✔ 读取数据成功 - 请求ID: ${requestId}`);
+          // 等待设备通过特征值变化事件返回数据
+        } catch (error) {
+          cleanup();
+          reject(error);
+        }
+      })();
     });
   }
 

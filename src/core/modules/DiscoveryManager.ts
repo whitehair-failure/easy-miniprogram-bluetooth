@@ -65,25 +65,15 @@ export class DiscoveryManager {
     if (!name) return false;
 
     // 检查黑名单：如果设备名包含任何排除关键字，则过滤掉
-    if (
-      this.searchOption.excludeKeys &&
-      this.searchOption.excludeKeys.length > 0
-    ) {
-      if (
-        this.searchOption.excludeKeys.some((key: string) => name.includes(key))
-      ) {
+    if (this.searchOption.excludeKeys && this.searchOption.excludeKeys.length > 0) {
+      if (this.searchOption.excludeKeys.some((key: string) => name.includes(key))) {
         return false;
       }
     }
 
     // 检查白名单：如果配置了，设备名必须包含其中至少一个
-    if (
-      this.searchOption.includeKeys &&
-      this.searchOption.includeKeys.length > 0
-    ) {
-      return this.searchOption.includeKeys.some((key: string) =>
-        name.includes(key),
-      );
+    if (this.searchOption.includeKeys && this.searchOption.includeKeys.length > 0) {
+      return this.searchOption.includeKeys.some((key: string) => name.includes(key));
     }
 
     // 如果没有配置任何过滤，接受所有设备
@@ -96,8 +86,7 @@ export class DiscoveryManager {
    * @throws {Error} 搜索失败
    */
   async startDeviceDiscovery(
-    searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this
-      .searchOption,
+    searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this.searchOption,
   ) {
     try {
       console.log(`准备搜寻附近的蓝牙外围设备...`);
@@ -133,10 +122,7 @@ export class DiscoveryManager {
         // 使用新的过滤逻辑（同时检查 name 和 localName）
         const isTarget = this.isDeviceMatched(device.name, device.localName);
 
-        if (
-          isTarget &&
-          !this._historyDevList.find((d) => d.deviceId === device.deviceId)
-        ) {
+        if (isTarget && !this._historyDevList.find((d) => d.deviceId === device.deviceId)) {
           this._historyDevList.push({
             ...device,
             reconnect: this.reconnect,
@@ -144,10 +130,7 @@ export class DiscoveryManager {
           });
         }
 
-        if (
-          isTarget &&
-          !this._foundDevList.find((d) => d.deviceId === device.deviceId)
-        ) {
+        if (isTarget && !this._foundDevList.find((d) => d.deviceId === device.deviceId)) {
           this._foundDevList.push({
             ...device,
             reconnect: this.reconnect,

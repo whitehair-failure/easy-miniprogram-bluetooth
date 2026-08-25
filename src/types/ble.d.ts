@@ -5,8 +5,7 @@ export interface Device extends WechatMiniprogram.BlueToothDevice {
   reconnect?: boolean;
 }
 
-export interface SearchOption
-  extends WechatMiniprogram.StartBluetoothDevicesDiscoveryOption {
+export interface SearchOption extends WechatMiniprogram.StartBluetoothDevicesDiscoveryOption {
   includeKeys?: string[];
   excludeKeys?: string[];
 }
@@ -16,7 +15,7 @@ export interface BLEHandlerConfig {
   readCharacteristicId?: string;
   writeCharacteristicId?: string;
   notifyCharacteristicId?: string;
-  notifyType?: 'notification' | 'indication'; // 通知类型，默认为 notification（大多数设备），部分设备仅支持 indication
+  notifyType?: "notification" | "indication"; // 通知类型，默认为 notification（大多数设备），部分设备仅支持 indication
 }
 
 export interface BLEHandlerConstructor {

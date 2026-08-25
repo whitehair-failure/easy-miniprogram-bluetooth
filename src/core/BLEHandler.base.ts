@@ -114,10 +114,7 @@ export abstract class BLEHandlerBase {
     // 注意：使用同一个 config 对象引用，确保 ServiceManager 和 IOManager 共享同一份配置
     const config = options.config ?? {};
     this.adapterManager = new AdapterManager();
-    this.discoveryManager = new DiscoveryManager(
-      this.searchOption,
-      this.reconnect
-    );
+    this.discoveryManager = new DiscoveryManager(this.searchOption, this.reconnect);
     this.connectionManager = this.createConnectionManager();
     this.serviceManager = new ServiceManager(config);
     this.ioManager = new IOManager(config);
@@ -132,7 +129,10 @@ export abstract class BLEHandlerBase {
    * 运行时更新设备过滤选项
    * 支持包含关键字（白名单）和排除关键字（黑名单）的灵活过滤
    */
-  updateDeviceFilterOptions(filterOptions: { includeKeys?: string[]; excludeKeys?: string[] }): void {
+  updateDeviceFilterOptions(filterOptions: {
+    includeKeys?: string[];
+    excludeKeys?: string[];
+  }): void {
     this.discoveryManager.updateSearchOption(filterOptions);
   }
 
@@ -179,7 +179,7 @@ export abstract class BLEHandlerBase {
    * @throws {Error}
    */
   async startDeviceDiscovery(
-    searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this.searchOption
+    searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this.searchOption,
   ): Promise<void> {
     await this.discoveryManager.startDeviceDiscovery(searchOption);
   }
@@ -213,7 +213,7 @@ export abstract class BLEHandlerBase {
    * @returns {function} 解绑函数
    */
   addConnectionStateChangeListener(
-    callback: (res: WechatMiniprogram.OnBLEConnectionStateChangeListenerResult) => void
+    callback: (res: WechatMiniprogram.OnBLEConnectionStateChangeListenerResult) => void,
   ): () => void {
     return this.connectionManager.addConnectionStateChangeListener(callback);
   }
@@ -242,7 +242,7 @@ export abstract class BLEHandlerBase {
    */
   async validateCharacteristics(
     deviceId: string,
-    serviceId?: string
+    serviceId?: string,
   ): Promise<CharacteristicCheckResult> {
     return await this.serviceManager.validateCharacteristics(deviceId, serviceId);
   }
@@ -254,16 +254,14 @@ export abstract class BLEHandlerBase {
   abstract enableCharacteristicNotification(
     deviceId: string,
     serviceId?: string,
-    characteristicId?: string
+    characteristicId?: string,
   ): Promise<void>;
 
   /**
    * 注册特征值变化回调，返回解绑函数
    */
   addCharacteristicValueChangeListener(
-    callback: (
-      result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult
-    ) => void
+    callback: (result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult) => void,
   ): () => void {
     return this.ioManager.addCharacteristicValueChangeListener(callback);
   }
@@ -272,9 +270,7 @@ export abstract class BLEHandlerBase {
    * 删除特定的特征值变化回调
    */
   removeCharacteristicValueChangeListener(
-    callback: (
-      result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult
-    ) => void
+    callback: (result: WechatMiniprogram.OnBLECharacteristicValueChangeListenerResult) => void,
   ): boolean {
     return this.ioManager.removeCharacteristicValueChangeListener(callback);
   }
@@ -314,7 +310,7 @@ export abstract class BLEHandlerBase {
   async release(): Promise<void> {
     if (this.connectedDevices.length !== 0) {
       // 断开所有连接的设备
-      for (let dev of this.connectedDevices) {
+      for (const dev of this.connectedDevices) {
         if (dev?.deviceId) {
           try {
             await this.disconnectDevice(dev.deviceId);
@@ -349,8 +345,8 @@ export abstract class BLEHandlerBase {
 
     // 2. 注册全局监听器（只注册一次）
     // 连接状态监听：重连回调 + WeChat 自动重连后恢复 notify 订阅
-    this.connectionManager.ensureConnectionStateListenerRegistered(
-      async (device: Device) => this.connectDevice(device)
+    this.connectionManager.ensureConnectionStateListenerRegistered(async (device: Device) =>
+      this.connectDevice(device),
     );
     // 特征值变化监听
     this.ioManager.ensureCharacteristicListenerRegistered();

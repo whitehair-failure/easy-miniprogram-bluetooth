@@ -25,9 +25,9 @@ npm install miniprogram-bluetooth-utils
 ## 导出 API
 
 ```typescript
-export * from './core/BLEHandler.base';
-export * from './core/SingleDeviceBLEHandler';
-export * from './core/MultiDeviceBLEHandler';
+export * from "./core/BLEHandler.base";
+export * from "./core/SingleDeviceBLEHandler";
+export * from "./core/MultiDeviceBLEHandler";
 
 // 兼容旧命名
 export { SingleDeviceBLEHandler as BLEHandler };
@@ -38,21 +38,21 @@ export { SingleDeviceBLEHandler as BLEHandler };
 ### 单设备模式（推荐）
 
 ```typescript
-import { BLEHandler } from 'miniprogram-bluetooth-utils';
+import { BLEHandler } from "miniprogram-bluetooth-utils";
 
 const ble = new BLEHandler({
   config: {
-    serviceUId: 'YOUR_SERVICE_UUID',
-    writeCharacteristicId: 'YOUR_WRITE_CHARACTERISTIC_UUID',
-    notifyCharacteristicId: 'YOUR_NOTIFY_CHARACTERISTIC_UUID',
-    readCharacteristicId: 'YOUR_READ_CHARACTERISTIC_UUID',
-    notifyType: 'notify', // 可选: 'notify' | 'indicate'
+    serviceUId: "YOUR_SERVICE_UUID",
+    writeCharacteristicId: "YOUR_WRITE_CHARACTERISTIC_UUID",
+    notifyCharacteristicId: "YOUR_NOTIFY_CHARACTERISTIC_UUID",
+    readCharacteristicId: "YOUR_READ_CHARACTERISTIC_UUID",
+    notifyType: "notify", // 可选: 'notify' | 'indicate'
   },
   searchOption: {
     allowDuplicatesKey: false,
     interval: 0,
-    includeKeys: ['设备名关键字'],
-    excludeKeys: ['Test', 'Debug'],
+    includeKeys: ["设备名关键字"],
+    excludeKeys: ["Test", "Debug"],
   },
   reconnect: true,
   maxRetries: 3,
@@ -66,7 +66,7 @@ try {
 
   // 2) 注册设备发现回调（返回解绑函数）
   const offDeviceFound = ble.addDeviceFoundListener((devices) => {
-    console.log('发现设备:', devices);
+    console.log("发现设备:", devices);
   });
 
   // 3) 开始搜索
@@ -80,12 +80,12 @@ try {
 
   // 5) 监听连接状态（返回解绑函数）
   const offConnection = ble.addConnectionStateChangeListener((res) => {
-    console.log('连接状态变化:', res.deviceId, res.connected);
+    console.log("连接状态变化:", res.deviceId, res.connected);
   });
 
   // 6) 监听特征值变化（返回解绑函数）
   const offValueChange = ble.addCharacteristicValueChangeListener((res) => {
-    console.log('收到数据:', res.value);
+    console.log("收到数据:", res.value);
   });
 
   // 7) 写入
@@ -100,14 +100,14 @@ try {
 
   // 8) 读取
   const data = await ble.readCharacteristicValue({ timeoutMs: 2000 });
-  console.log('读取成功:', data);
+  console.log("读取成功:", data);
 
   // 使用完后可按需解绑
   offDeviceFound();
   offConnection();
   offValueChange();
 } catch (err) {
-  console.error('BLE 操作失败:', err);
+  console.error("BLE 操作失败:", err);
 }
 
 // 页面卸载 / 组件销毁时
@@ -117,13 +117,13 @@ try {
 ### 多设备模式
 
 ```typescript
-import { MultiDeviceBLEHandler } from 'miniprogram-bluetooth-utils';
+import { MultiDeviceBLEHandler } from "miniprogram-bluetooth-utils";
 
 const ble = new MultiDeviceBLEHandler({
   config: {
-    serviceUId: 'YOUR_SERVICE_UUID',
-    writeCharacteristicId: 'YOUR_WRITE_CHARACTERISTIC_UUID',
-    notifyCharacteristicId: 'YOUR_NOTIFY_CHARACTERISTIC_UUID',
+    serviceUId: "YOUR_SERVICE_UUID",
+    writeCharacteristicId: "YOUR_WRITE_CHARACTERISTIC_UUID",
+    notifyCharacteristicId: "YOUR_NOTIFY_CHARACTERISTIC_UUID",
   },
   reconnect: true,
   searchOption: {
@@ -178,7 +178,7 @@ interface BLEHandlerConstructor {
   connectTimeout?: number;
   maxRetries?: number;
   reconnectDelay?: number;
-  mode?: 'single' | 'multiple';
+  mode?: "single" | "multiple";
 }
 
 interface BLEHandlerConfig {
@@ -186,7 +186,7 @@ interface BLEHandlerConfig {
   readCharacteristicId?: string;
   writeCharacteristicId?: string;
   notifyCharacteristicId?: string;
-  notifyType?: 'notification' | 'indication';
+  notifyType?: "notification" | "indication";
 }
 ```
 
@@ -247,10 +247,10 @@ try {
   // 微信原生错误对象（errMsg / errno / errCode）或原生 Error
   if (err?.errno === 103 || err?.errCode === 103) {
     // 蓝牙权限未授权
-  } else if (err?.errMsg?.includes('timeout')) {
+  } else if (err?.errMsg?.includes("timeout")) {
     // 超时
   } else {
-    console.error('BLE 操作失败:', err?.errMsg || err);
+    console.error("BLE 操作失败:", err?.errMsg || err);
   }
 }
 ```

@@ -27,8 +27,7 @@ tsc --noEmit        # 类型检查（修改代码后必须执行）
 
 ## 目录结构
 
-`
-src/
+`src/
 ├── index.ts                          # 入口：导出所有公共 API
 ├── core/
 │   ├── BLEHandler.base.ts            # 抽象基类 BLEHandlerBase
@@ -44,8 +43,7 @@ src/
 │   └── ble.d.ts                      # 所有类型定义
 └── utils/
     ├── runtime.ts                    # 运行时环境判断（鸿蒙/devtools 跳过 BLE API）
-    └── uuid.ts                       # UUID 工具（短 UUID → 128 位标准转换）
-`
+    └── uuid.ts                       # UUID 工具（短 UUID → 128 位标准转换）`
 
 > ⚠️ BluetoothManager.ts **不存在**。旧文档中的该文件已在重构时移除。
 > ⚠️ BLEHandler.ts.backup 是重构前备份，**不参与编译**。
@@ -63,42 +61,42 @@ src/
 
 ## 关键类型（src/types/ble.d.ts）
 
-`	Typescript
+` Typescript
 interface Device extends WechatMiniprogram.BlueToothDevice {
-  isConnect: boolean;
-  reconnect?: boolean;
+isConnect: boolean;
+reconnect?: boolean;
 }
 
 interface BLEHandlerConfig {
-  serviceUId?: string;                  // 可选（未设置时跳过特征值验证）
-  readCharacteristicId?: string;
-  writeCharacteristicId?: string;
-  notifyCharacteristicId?: string;
-  notifyType?: 'notification' | 'indication';   // 通知类型，默认 "notify"（大多数设备），部分设备仅支持 "indicate"
+serviceUId?: string; // 可选（未设置时跳过特征值验证）
+readCharacteristicId?: string;
+writeCharacteristicId?: string;
+notifyCharacteristicId?: string;
+notifyType?: 'notification' | 'indication'; // 通知类型，默认 "notify"（大多数设备），部分设备仅支持 "indicate"
 }
 
 interface SearchOption extends WechatMiniprogram.StartBluetoothDevicesDiscoveryOption {
-  includeKeys?: string[];               // 白名单（设备名/localName 包含）
-  excludeKeys?: string[];               // 黑名单
+includeKeys?: string[]; // 白名单（设备名/localName 包含）
+excludeKeys?: string[]; // 黑名单
 }
 
 interface BLEHandlerConstructor {
-  config?: BLEHandlerConfig;
-  searchOption: SearchOption;           // 包含过滤选项 includeKeys 和 excludeKeys
-  reconnect?: boolean;
-  connectTimeout?: number;
-  maxRetries?: number;
-  reconnectDelay?: number;
-  mode?: "single" | "multiple";        // 仅文档用途，类型由子类决定
+config?: BLEHandlerConfig;
+searchOption: SearchOption; // 包含过滤选项 includeKeys 和 excludeKeys
+reconnect?: boolean;
+connectTimeout?: number;
+maxRetries?: number;
+reconnectDelay?: number;
+mode?: "single" | "multiple"; // 仅文档用途，类型由子类决定
 }
 
 interface writeCharacteristicOption extends WechatMiniprogram.WriteBLECharacteristicValueOption {
-  hasResponse?: boolean;
-  timeoutMs?: number;
+hasResponse?: boolean;
+timeoutMs?: number;
 }
 
 interface readCharacteristicOption extends WechatMiniprogram.ReadBLECharacteristicValueOption {
-  timeoutMs?: number;
+timeoutMs?: number;
 }
 `
 
@@ -130,17 +128,17 @@ try {
 
 ### 所有类共有（BLEHandlerBase）
 
-`	Typescript
+` Typescript
 // 适配器与初始化
 getAdapterStatus(): Promise<void>
 openAdapter(): Promise<void>
 closeAdapter(): Promise<void>
-release(): Promise<void>                              // 完全释放资源，重置所有标志位，可再次调用 init()
-init(): Promise<void>                                 // 必须在 new 后调用，打开适配器、注册全局监听器
+release(): Promise<void> // 完全释放资源，重置所有标志位，可再次调用 init()
+init(): Promise<void> // 必须在 new 后调用，打开适配器、注册全局监听器
 
 // 设备发现
 startDeviceDiscovery(searchOption?): Promise<void>
-addDeviceFoundListener(callback: (devices: Device[]) => void): () => void   // 返回解绑函数
+addDeviceFoundListener(callback: (devices: Device[]) => void): () => void // 返回解绑函数
 stopDeviceDiscovery(): Promise<void>
 
 // 过滤
@@ -151,7 +149,7 @@ getDeviceFilterOptions(): { includeKeys?: string[]; excludeKeys?: string[] }
 addConnectionStateChangeListener(callback: (res) => void): () => void
 
 // I/O 事件（init() 时自动激活平台监听，用户只需按需添加回调）
-addCharacteristicValueChangeListener(callback): () => void     // 返回解绑函数
+addCharacteristicValueChangeListener(callback): () => void // 返回解绑函数
 removeCharacteristicValueChangeListener(callback): boolean
 removeAllCharacteristicValueChangeListeners(): void
 
@@ -205,11 +203,13 @@ export { SingleDeviceBLEHandler as BLEHandler }  // 向后兼容
 ## 开发规范
 
 ### 命名
+
 - Manager 类：PascalCase + Manager（如 ConnectionManager）
 - 方法：动词开头 camelCase（如 connectDevice）
 - 对外 API **不使用 BLE 前缀**
 
 ### 事件监听模式
+
 - 所有三个平台监听器（连接状态、特征值变化、设备发现）均只向 wx 注册一次，在 `init()` 中自动激活（不再在构造器中）
 - 注册方法返回解绑函数（`() => void`）
 - 同时提供 `remove...` 和 `removeAll...` 方法（仅 IOManager 特征值回调）
@@ -217,16 +217,19 @@ export { SingleDeviceBLEHandler as BLEHandler }  // 向后兼容
 - `release()` 调用后，所有标志位重置，允许再次调用 `init()` 重新注册
 
 ### 数组保护
+
 - connectedDevices、foundDevList 等均为**私有数组 + 深拷贝 getter**
 - 不要绕过 getter 直接修改内部状态
 
 ### 重连机制
+
 - ConnectionManager 用 reconnectGenerations Map 跟踪每设备代次
 - 递增代次即可取消重连循环（无需手动 cancel）
 - 单设备模式切换目标时调用 cancelReconnectsExcept(newDeviceId)
 - `disconnect()` 或 `release()` 时自动取消该设备的重连任务
 
 ### 初始化与释放流程
+
 - **初始化**：`const ble = new Handler(...); await ble.init();`
   - 构造器：同步初始化管理器、解析配置
   - `init()`：异步打开适配器、注册全局监听器
@@ -240,13 +243,13 @@ export { SingleDeviceBLEHandler as BLEHandler }  // 向后兼容
 
 ## 文档索引
 
-| 文档 | 用途 |
-|---|---|
-| [README.md](./README.md) | 用户文档、快速开始、API 概览 |
-| [doc/archive/EXAMPLES.md](./doc/archive/EXAMPLES.md) | 12+ 个完整可运行示例 |
-| [doc/archive/ARCHITECTURE.md](./doc/archive/ARCHITECTURE.md) | 架构设计与设计模式 |
-| [doc/archive/DEVICE_FILTER_GUIDE.md](./doc/archive/DEVICE_FILTER_GUIDE.md) | 设备过滤详细指南 |
-| [doc/archive/RENAME.md](./doc/archive/RENAME.md) | 旧 API 新 API 迁移对照 |
-| [change-log](./change-log/*) | 版本变更记录 |
+| 文档                                                                       | 用途                         |
+| -------------------------------------------------------------------------- | ---------------------------- |
+| [README.md](./README.md)                                                   | 用户文档、快速开始、API 概览 |
+| [doc/archive/EXAMPLES.md](./doc/archive/EXAMPLES.md)                       | 12+ 个完整可运行示例         |
+| [doc/archive/ARCHITECTURE.md](./doc/archive/ARCHITECTURE.md)               | 架构设计与设计模式           |
+| [doc/archive/DEVICE_FILTER_GUIDE.md](./doc/archive/DEVICE_FILTER_GUIDE.md) | 设备过滤详细指南             |
+| [doc/archive/RENAME.md](./doc/archive/RENAME.md)                           | 旧 API 新 API 迁移对照       |
+| [change-log](./change-log/*)                                               | 版本变更记录                 |
 
 ---
