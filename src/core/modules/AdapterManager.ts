@@ -3,6 +3,7 @@
  * 负责适配器的初始化、状态检查、关闭等操作
  */
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
+import { debugLog, debugError } from "../../utils/logger";
 
 export class AdapterManager {
   /**
@@ -12,7 +13,7 @@ export class AdapterManager {
    */
   async getAdapterStatus() {
     try {
-      console.log(`查看蓝牙适配器状态...`);
+      debugLog(`查看蓝牙适配器状态...`);
       if (shouldSkipBLEApiCall("getBluetoothAdapterState")) {
         return {
           available: true,
@@ -20,7 +21,7 @@ export class AdapterManager {
         } as WechatMiniprogram.GetBluetoothAdapterStateSuccessCallbackResult;
       }
       const res = await wx.getBluetoothAdapterState();
-      console.log(`✔ 适配器状态获取成功！`);
+      debugLog(`✔ 适配器状态获取成功！`);
       return res;
     } catch (err: any) {
       if (err?.errno === 103 || err?.errCode === 103) {
@@ -41,15 +42,15 @@ export class AdapterManager {
    */
   async openAdapter() {
     try {
-      console.log(`准备初始化蓝牙适配器...`);
+      debugLog(`准备初始化蓝牙适配器...`);
       if (shouldSkipBLEApiCall("openBluetoothAdapter")) {
         return { success: true };
       }
       const res = await wx.openBluetoothAdapter({ mode: "central" });
-      console.log(`✔ 适配器初始化成功！`);
+      debugLog(`✔ 适配器初始化成功！`);
       return res;
     } catch (err) {
-      console.error(`✘ 初始化失败！`, err);
+      debugError(`✘ 初始化失败！`, err);
       throw err;
     }
   }
@@ -61,15 +62,15 @@ export class AdapterManager {
    */
   async closeAdapter() {
     try {
-      console.log(`释放蓝牙适配器...`);
+      debugLog(`释放蓝牙适配器...`);
       if (shouldSkipBLEApiCall("closeBluetoothAdapter")) {
         return { success: true };
       }
       const res = await wx.closeBluetoothAdapter();
-      console.log(`✔ 释放适配器成功！`);
+      debugLog(`✔ 释放适配器成功！`);
       return res;
     } catch (err) {
-      console.error(`✘ 释放适配器失败！`, err);
+      debugError(`✘ 释放适配器失败！`, err);
       throw err;
     }
   }
@@ -86,10 +87,10 @@ export class AdapterManager {
         return { RSSI: 0 };
       }
       const res = await wx.getBLEDeviceRSSI({ deviceId });
-      console.log(`✔ 获取信号强度成功!`);
+      debugLog(`✔ 获取信号强度成功!`);
       return res;
     } catch (err: any) {
-      console.error(`✘ 获取信号强度失败！${err}`);
+      debugError(`✘ 获取信号强度失败！${err}`);
       throw err;
     }
   }

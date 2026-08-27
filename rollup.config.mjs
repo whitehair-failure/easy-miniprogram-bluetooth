@@ -3,6 +3,25 @@ import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import typescript from "rollup-plugin-typescript2";
 import terser from "@rollup/plugin-terser";
+import fs from "node:fs";
+import path from "node:path";
+
+// 复制手写的类型声明文件（src/types/*.d.ts）到 dist/types/，
+// 因为 rollup-plugin-typescript2 只处理入口链上的 .ts 文件，不会复制独立 .d.ts。
+// 否则 dist/core/*.d.ts 里 `import ... from "../types/ble"` 会悬空。
+const copyTypesPlugin = {
+  name: "copy-types",
+  writeBundle() {
+    const srcDir = path.resolve("src/types");
+    const outDir = path.resolve("dist/types");
+    fs.mkdirSync(outDir, { recursive: true });
+    for (const file of fs.readdirSync(srcDir)) {
+      if (file.endsWith(".d.ts")) {
+        fs.copyFileSync(path.join(srcDir, file), path.join(outDir, file));
+      }
+    }
+  },
+};
 
 // 共享的压缩配置（每个产物单独创建 terser 实例，避免共享实例状态）
 const terserOptions = {
@@ -32,8 +51,7 @@ export default {
       plugins: [terser(terserOptions)],
     },
   ],
-  // 将微信小程序全局对象标记为外部依赖，不打包
-  external: ["wx"],
+  // 注：wx 作为全局变量使用（非 import），无需 external 标记
   plugins: [
     resolve(),
     commonjs(),
@@ -41,5 +59,6 @@ export default {
     typescript({
       useTsconfigDeclarationDir: true,
     }),
+    copyTypesPlugin,
   ],
 };

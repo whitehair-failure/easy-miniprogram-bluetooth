@@ -4,6 +4,7 @@
  */
 import type { Device } from "../../types/ble";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
+import { debugLog, debugError, debugWarn } from "../../utils/logger";
 
 export class ConnectionManager {
   private _connectedDevices: Device[] = []; // 已连接的设备列表（私有）
@@ -15,6 +16,7 @@ export class ConnectionManager {
   private readonly reconnect: boolean;
   private readonly maxRetries: number;
   private readonly reconnectDelay: number;
+  private reconnectingDevices: Set<string> = new Set();
   // 单设备模式：当前用户期望连接/保持的目标设备，用于抑制其他设备的自动重连
   private activeTargetDeviceId?: string;
   // 为每个设备维护一个“重连代次”标识，递增以取消既有重连循环
@@ -141,16 +143,16 @@ export class ConnectionManager {
 
     try {
       // 连接设备
-      console.log(`准备连接设备...`);
+      debugLog(`准备连接设备...`);
       if (shouldSkipBLEApiCall("createBLEConnection")) {
-        console.log(`当前为 devtools，模拟连接成功`);
+        debugLog(`当前为 devtools，模拟连接成功`);
       } else {
         await wx.createBLEConnection({
           deviceId: dev.deviceId,
           timeout: connectTimeout,
         });
       }
-      console.log(`连接蓝牙设备成功！`);
+      debugLog(`连接蓝牙设备成功！`);
 
       dev.isConnect = true; // 更新设备状态为已连接
       if (this.mode === "single") {
@@ -178,7 +180,7 @@ export class ConnectionManager {
         await onServicesReady(dev.deviceId);
       }
     } catch (err) {
-      console.error(`连接蓝牙设备失败！`, err);
+      debugError(`连接蓝牙设备失败！`, err);
       throw err;
     }
   }
@@ -193,78 +195,85 @@ export class ConnectionManager {
     device: Device,
     onReconnect: (device: Device) => Promise<void>,
   ): Promise<boolean> {
+    this.reconnectingDevices.add(device.deviceId);
     const maxRetries = this.maxRetries;
     let retryCount = 0;
     // 捕获开始时的重连“代次”，若期间被取消则终止循环
     const localGeneration = this.getReconnectGenerationForDevice(device.deviceId);
 
-    while (retryCount < maxRetries) {
-      // 若在单设备模式下，且当前用户指定的目标设备并非该设备，则立即停止该设备的重连
-      if (
-        this.mode === "single" &&
-        this.activeTargetDeviceId &&
-        this.activeTargetDeviceId !== device.deviceId
-      ) {
-        console.log(
-          `跳过设备 ${device.name}(${device.deviceId}) 的重连：当前目标为${this.activeTargetDeviceId}`,
-        );
-        return false;
-      }
-
-      // 若重连代次发生变化，说明被取消了
-      if (localGeneration !== this.getReconnectGenerationForDevice(device.deviceId)) {
-        console.log(`设备 ${device.name}(${device.deviceId}) 重连已被取消（generation 变化）`);
-        return false;
-      }
-      try {
-        console.log(`开始第 ${retryCount + 1} 次重连..`);
-
-        // 等待重连延时(连接超时时间+重连延时)，以避免频繁重连导致的资源占用和冲突
-        await new Promise((resolve) =>
-          setTimeout(resolve, this.connectTimeout + this.reconnectDelay),
-        );
-
-        // 再次在延时后检查是否被取消或被切换目标
+    try {
+      while (retryCount < maxRetries) {
+        // 若在单设备模式下，且当前用户指定的目标设备并非该设备，则立即停止该设备的重连
         if (
           this.mode === "single" &&
           this.activeTargetDeviceId &&
           this.activeTargetDeviceId !== device.deviceId
         ) {
-          console.log(
-            `在延时后停止设备 ${device.name}(${device.deviceId}) 的重连：当前目标为${this.activeTargetDeviceId}`,
+          debugLog(
+            `跳过设备 ${device.name}(${device.deviceId}) 的重连：当前目标为${this.activeTargetDeviceId}`,
           );
           return false;
         }
+
+        // 若重连代次发生变化，说明被取消了
         if (localGeneration !== this.getReconnectGenerationForDevice(device.deviceId)) {
-          console.log(
-            `设备 ${device.name}(${device.deviceId}) 重连在延时后被取消（generation 变化）`,
-          );
+          debugLog(`设备 ${device.name}(${device.deviceId}) 重连已被取消（generation 变化）`);
           return false;
         }
-
-        // 尝试重新连接
         try {
-          await onReconnect(device);
-          console.log(`设备 ${device.name}(${device.deviceId}) 重连成功`);
-          // 单设备模式，成功重连后更新目标并取消其他设备的重连任务
-          if (this.mode === "single") {
-            this.activeTargetDeviceId = device.deviceId;
-            this.cancelReconnectsExcept(device.deviceId);
-          }
-          return true;
-        } catch (err) {
-          // 重连失败，继续重试
-          retryCount++;
-          console.log(`第 ${retryCount} 次重连失败`, err);
-        }
-      } catch (error) {
-        retryCount++;
-        console.error(`第 ${retryCount} 次重连发生错误`, error);
-      }
-    }
+          debugLog(`开始第 ${retryCount + 1} 次重连..`);
 
-    console.error(`设备 ${device.name}(${device.deviceId}) 重连失败,已达到最大重试次数`);
-    return false;
+          // 等待重连延时(连接超时时间+重连延时)，以避免频繁重连导致的资源占用和冲突
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.connectTimeout + this.reconnectDelay),
+          );
+
+          // 再次在延时后检查是否被取消或被切换目标
+          if (
+            this.mode === "single" &&
+            this.activeTargetDeviceId &&
+            this.activeTargetDeviceId !== device.deviceId
+          ) {
+            debugLog(
+              `在延时后停止设备 ${device.name}(${device.deviceId}) 的重连：当前目标为${this.activeTargetDeviceId}`,
+            );
+            return false;
+          }
+          if (localGeneration !== this.getReconnectGenerationForDevice(device.deviceId)) {
+            debugLog(
+              `设备 ${device.name}(${device.deviceId}) 重连在延时后被取消（generation 变化）`,
+            );
+            return false;
+          }
+
+          // 尝试重新连接
+          try {
+            await onReconnect(device);
+            debugLog(`设备 ${device.name}(${device.deviceId}) 重连成功`);
+            // 使同一设备已经存在的其他重连循环立即失效
+            this.cancelReconnectForDevice(device.deviceId);
+            // 单设备模式，成功重连后更新目标并取消其他设备的重连任务
+            if (this.mode === "single") {
+              this.activeTargetDeviceId = device.deviceId;
+              this.cancelReconnectsExcept(device.deviceId);
+            }
+            return true;
+          } catch (err) {
+            // 重连失败，继续重试
+            retryCount++;
+            debugLog(`第 ${retryCount} 次重连失败`, err);
+          }
+        } catch (error) {
+          retryCount++;
+          debugError(`第 ${retryCount} 次重连发生错误`, error);
+        }
+      }
+
+      debugError(`设备 ${device.name}(${device.deviceId}) 重连失败,已达到最大重试次数`);
+      return false;
+    } finally {
+      this.reconnectingDevices.delete(device.deviceId);
+    }
   }
 
   /**
@@ -284,14 +293,14 @@ export class ConnectionManager {
     }
 
     wx.onBLEConnectionStateChange(async (res) => {
-      console.log("onBLEConnectionStateChange", res);
+      debugLog("onBLEConnectionStateChange", res);
 
       // 自动重连
       if (!res.connected) {
         const index = this._connectedDevices.findIndex((d) => d.deviceId === res.deviceId);
 
         if (index === -1) {
-          console.warn(`Device ${res.deviceId} not found in connected list`);
+          debugWarn(`设备 ${res.deviceId} 不在已连接列表中`);
           return;
         }
 
@@ -305,23 +314,24 @@ export class ConnectionManager {
             this.activeTargetDeviceId &&
             this.activeTargetDeviceId !== device.deviceId
           ) {
-            console.log(
+            debugLog(
               `跳过设备 ${device.name}(${device.deviceId}) 的自动重连，当前目标为${this.activeTargetDeviceId}`,
             );
             // 明确取消该设备的任何在进行中的重连任务
             this.cancelReconnectForDevice(device.deviceId);
-          } else {
+          } else if (!this.reconnectingDevices.has(device.deviceId)) {
+            debugLog(`设备 ${device.name}(${device.deviceId}) 开启重连任务`);
             const success = await this.attemptReconnect(device, this._onReconnect);
             if (!success) {
               // 重连失败,从已连接列表中移除
               this._connectedDevices.splice(index, 1);
-              console.log(`设备 ${device.name} 已从已连接列表中移除`);
+              debugLog(`设备 ${device.name} 已从已连接列表中移除`);
             }
           }
         } else {
           // 不需要重连，直接移除
           this._connectedDevices.splice(index, 1);
-          console.log(`设备 ${device.name} 断开连接`);
+          debugLog(`设备 ${device.name} 断开连接`);
         }
       } else {
         // 如果该设备已在处理中，则忽略本次回调，防止重复执行
@@ -348,11 +358,11 @@ export class ConnectionManager {
 
               if (deviceFromHistory) {
                 // 从历史记录中找到，添加到当前连接列表
-                console.log(`微信自动重连成功，恢复设备 ${res.deviceId}`);
+                debugLog(`微信自动重连成功，恢复设备 ${res.deviceId}`);
                 this._connectedDevices.push(deviceFromHistory);
               } else {
                 // 这是一个未知的、不在历史记录中的设备，强制断开
-                console.warn(`发现未知设备自动重连: ${res.deviceId}，将强制断开。`);
+                debugWarn(`发现未知设备自动重连: ${res.deviceId}，将强制断开。`);
                 await this.disconnectDevice(res.deviceId);
               }
             }
@@ -393,6 +403,13 @@ export class ConnectionManager {
   offConnectionStateListener(): void {
     this.connectionStateCallbacks.clear();
     this.isConnectionStateListenerRegistered = false;
+    // 释放资源时重置连接相关状态，避免再次 init() 后残留旧数据
+    this._connectedDevices = [];
+    this._historyConnectedDevices = [];
+    this.reconnectGenerations.clear();
+    this.reconnectingDevices.clear();
+    this.processingConnections.clear();
+    this.activeTargetDeviceId = undefined;
   }
 
   /**
@@ -414,13 +431,13 @@ export class ConnectionManager {
     // 断开前取消该设备的任何重连循环
     this.cancelReconnectForDevice(deviceId);
 
-    console.log(`断开蓝牙连接...`);
+    debugLog(`断开蓝牙连接...`);
     if (shouldSkipBLEApiCall("closeBLEConnection")) {
-      console.log(`当前为 devtools，模拟断开成功`);
+      debugLog(`当前为 devtools，模拟断开成功`);
     } else {
       await wx.closeBLEConnection({ deviceId });
     }
-    console.log(`断开蓝牙成功！`);
+    debugLog(`断开蓝牙成功！`);
 
     if (this.mode === "single") {
       this._connectedDevices = []; // 清空已连接设备列表

@@ -26,6 +26,7 @@ export interface BLEHandlerConstructor {
   maxRetries?: number; // 最大自动重连次数
   reconnectDelay?: number; // 每次自动重连间隔时间，单位毫秒
   mode?: "single" | "multiple";
+  debug?: boolean; // 是否开启调试日志（默认关闭静默，true 时输出 debugLog/debugError/debugWarn）
 }
 
 export interface CharacteristicCheckResult {
@@ -50,4 +51,12 @@ export interface writeCharacteristicOption
 export interface readCharacteristicOption
   extends WechatMiniprogram.ReadBLECharacteristicValueOption {
   timeoutMs?: number;
+}
+
+// 特征值读取/写入响应的返回结果（value 为 ArrayBuffer 转换后的字节数组）
+export interface CharacteristicValueResult {
+  deviceId: string;
+  serviceId: string;
+  characteristicId: string;
+  value: number[]; // 原始 ArrayBuffer 转为普通字节数组
 }

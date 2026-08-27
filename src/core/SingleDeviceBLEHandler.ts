@@ -117,12 +117,12 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
    * 读取数据帧
    * @throws {Error}
    */
-  async readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer> {
+  async readCharacteristicValue(options: readCharacteristicOption): Promise<number[]> {
     const result = await this.ioManager.readCharacteristicValue(
       options,
       "single",
       this.singleConnectedDevice?.deviceId,
     );
-    return result?.value || new ArrayBuffer(0);
+    return result?.value || [];
   }
 }

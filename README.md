@@ -2,7 +2,7 @@
 
 微信小程序低功耗蓝牙（BLE）工具封装库，提供简洁的 API 来管理设备发现、连接、通知订阅与数据读写。
 
-> 新用户建议先看 [文档导航](./doc/archive/INDEX.md)。
+> 新用户建议先看 [文档导航](./doc/INDEX.md)。
 
 ## 特性
 
@@ -12,6 +12,7 @@
 - 过滤机制：支持白名单 `includeKeys` + 黑名单 `excludeKeys`。
 - 超时控制：连接、读写都支持超时参数。
 - 模块化架构：基类 + 5 个 Manager，职责清晰。
+- 调试日志开关：默认静默，构造时传 `debug: true` 或 `setDebugEnabled(true)` 开启。
 - TypeScript：完整类型定义。
 
 ## 安装
@@ -46,7 +47,7 @@ const ble = new BLEHandler({
     writeCharacteristicId: "YOUR_WRITE_CHARACTERISTIC_UUID",
     notifyCharacteristicId: "YOUR_NOTIFY_CHARACTERISTIC_UUID",
     readCharacteristicId: "YOUR_READ_CHARACTERISTIC_UUID",
-    notifyType: "notify", // 可选: 'notify' | 'indicate'
+    notifyType: "notification", // 可选: 'notification' | 'indication'
   },
   searchOption: {
     allowDuplicatesKey: false,
@@ -98,7 +99,7 @@ try {
     },
   });
 
-  // 8) 读取
+  // 8) 读取（返回 number[]，即原始 ArrayBuffer 转成的字节数组）
   const data = await ble.readCharacteristicValue({ timeoutMs: 2000 });
   console.log("读取成功:", data);
 
@@ -179,6 +180,7 @@ interface BLEHandlerConstructor {
   maxRetries?: number;
   reconnectDelay?: number;
   mode?: "single" | "multiple";
+  debug?: boolean;
 }
 
 interface BLEHandlerConfig {
@@ -266,7 +268,6 @@ src/
 │   ├── BLEHandler.base.ts
 │   ├── SingleDeviceBLEHandler.ts
 │   ├── MultiDeviceBLEHandler.ts
-│   ├── BLEHandler.ts.backup
 │   └── modules/
 │       ├── AdapterManager.ts
 │       ├── DiscoveryManager.ts
@@ -276,6 +277,8 @@ src/
 ├── types/
 │   └── ble.d.ts
 └── utils/
+    ├── config.ts
+    ├── logger.ts
     ├── runtime.ts
     └── uuid.ts
 ```
@@ -291,12 +294,12 @@ npx tsc --noEmit
 
 ## 文档
 
-- [文档导航](./doc/archive/INDEX.md)
-- [详细示例](./doc/archive/EXAMPLES.md)
-- [架构设计](./doc/archive/ARCHITECTURE.md)
+- [文档导航](./doc/INDEX.md)
+- [详细示例](./doc/EXAMPLES.md)
+- [架构设计](./doc/ARCHITECTURE.md)
 - [设备过滤指南](./doc/archive/DEVICE_FILTER_GUIDE.md)
 - [API 迁移说明](./doc/archive/RENAME.md)
-- [更新日志](./change-log/*)
+- [更新日志](./change-log/)
 
 ## 注意事项
 

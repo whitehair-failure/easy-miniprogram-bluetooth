@@ -6,10 +6,12 @@ import type {
   writeCharacteristicOption,
   readCharacteristicOption,
   BLEHandlerConfig,
+  CharacteristicValueResult,
 } from "../../types/ble";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 import { convertConfigUUIDs } from "../../utils/uuid";
 import { validateBLEHandlerConfig } from "../../utils/config";
+import { debugLog, debugError } from "../../utils/logger";
 
 export class IOManager {
   // 请求队列：存储待响应的请求信息，用于精确匹配
@@ -49,7 +51,7 @@ export class IOManager {
    */
   setBLEHandlerConfig(cfg: Partial<BLEHandlerConfig>): BLEHandlerConfig {
     if (!cfg || typeof cfg !== "object") {
-      throw new Error("Invalid config object");
+      throw new Error("配置对象无效");
     }
 
     // 验证传入的字段类型
@@ -58,15 +60,16 @@ export class IOManager {
       "writeCharacteristicId",
       "notifyCharacteristicId",
       "readCharacteristicId",
+      "notifyType",
     ];
 
     for (const key of Object.keys(cfg) as Array<string>) {
       if (!allowedKeys.includes(key as any)) {
-        throw new Error(`Unknown config key: ${key}`);
+        throw new Error(`未知的配置项: ${key}`);
       }
       const val = (cfg as any)[key];
       if (val != null && typeof val !== "string") {
-        throw new Error(`Invalid type for ${key}, expected string`);
+        throw new Error(`配置项 ${key} 类型无效，应为字符串`);
       }
     }
 
@@ -85,6 +88,7 @@ export class IOManager {
       this.config.notifyCharacteristicId = convertedCfg.notifyCharacteristicId;
     if (convertedCfg.readCharacteristicId)
       this.config.readCharacteristicId = convertedCfg.readCharacteristicId;
+    if (convertedCfg.notifyType) this.config.notifyType = convertedCfg.notifyType;
 
     return this.config;
   }
@@ -112,7 +116,7 @@ export class IOManager {
         characteristicId: res.characteristicId,
         value: Array.from(buffer), // 转换为普通数组以便打印
       };
-      console.log("onBLECharacteristicValueChange event received:", newRes);
+      debugLog("onBLECharacteristicValueChange event received:", newRes);
 
       // 精确匹配：根据 deviceId 和 characteristicId 找到对应的请求
       if (this.pendingRequests.size > 0) {
@@ -136,16 +140,16 @@ export class IOManager {
             if (request.timeoutId) {
               clearTimeout(request.timeoutId);
             }
-            console.log("newRes", newRes);
+            debugLog("newRes", newRes);
 
             // 解析 Promise
             request.resolve(newRes);
             // 从队列中删除
             this.pendingRequests.delete(matchedRequestId);
-            console.log(`请求 ${matchedRequestId} 已匹配并完成`);
+            debugLog(`请求 ${matchedRequestId} 已匹配并完成`);
           }
         } else {
-          console.log(
+          debugLog(
             `未找到匹配的请求: deviceId=${res.deviceId}, characteristicId=${res.characteristicId}`,
           );
         }
@@ -156,7 +160,7 @@ export class IOManager {
         try {
           callback(res);
         } catch (error) {
-          console.error("特征值变化回调执行出错:", error);
+          debugError("特征值变化回调执行出错:", error);
         }
       });
     });
@@ -278,7 +282,7 @@ export class IOManager {
     }
 
     if (hasResponse) {
-      console.log("hasResponse");
+      debugLog("hasResponse");
 
       // 生成一个唯一的请求ID
       const requestId = `req_${this.requestCounter++}`;
@@ -307,7 +311,7 @@ export class IOManager {
           deviceId: targetDeviceId!,
           characteristicId: respCharIdFinal,
           resolve: (result) => {
-            console.log("newResResult", result);
+            debugLog("newResResult", result);
             cleanup();
             resolve(result);
           },
@@ -318,7 +322,7 @@ export class IOManager {
           timeoutId,
         });
 
-        console.log(
+        debugLog(
           `发送写入请求 - 请求ID: ${requestId}, 设备: ${targetDeviceId}, 服务: ${writeServiceIdFinal}, 特征值: ${writeCharIdFinal}`,
         );
 
@@ -336,7 +340,7 @@ export class IOManager {
             }
 
             await wx.writeBLECharacteristicValue(WriteBLECharacteristicValueOption);
-            console.log(`✔ 写入数据成功 - 请求ID: ${requestId}`);
+            debugLog(`✔ 写入数据成功 - 请求ID: ${requestId}`);
             // 等待设备响应（通过特征值变化事件）
           } catch (error) {
             cleanup();
@@ -356,7 +360,7 @@ export class IOManager {
       }
 
       await wx.writeBLECharacteristicValue(WriteBLECharacteristicValueOption);
-      console.log(`✔ 写入数据成功（无需响应）`);
+      debugLog(`✔ 写入数据成功（无需响应）`);
       return { success: true };
     }
   }
@@ -377,7 +381,7 @@ export class IOManager {
     options: readCharacteristicOption,
     mode: "single" | "multiple",
     connectedSingleDeviceId?: string,
-  ): Promise<any> {
+  ): Promise<CharacteristicValueResult> {
     const { deviceId: optDeviceId, timeoutMs, serviceId, characteristicId } = options;
 
     let targetDeviceId: string | undefined;
@@ -453,7 +457,7 @@ export class IOManager {
             serviceId: serviceIdFinal,
             characteristicId: characteristicIdFinal,
           });
-          console.log(`✔ 读取数据成功 - 请求ID: ${requestId}`);
+          debugLog(`✔ 读取数据成功 - 请求ID: ${requestId}`);
           // 等待设备通过特征值变化事件返回数据
         } catch (error) {
           cleanup();

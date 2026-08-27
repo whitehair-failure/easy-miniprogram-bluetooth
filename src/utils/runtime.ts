@@ -1,3 +1,5 @@
+import { debugLog } from "./logger";
+
 let cachedIsDevtools: boolean | undefined;
 let cachedIsHarmony: boolean | undefined;
 
@@ -30,7 +32,7 @@ export function isDevtoolsPlatform(): boolean {
 export function shouldSkipBLEApiCall(apiName: string): boolean {
   const shouldSkip = isDevtoolsPlatform();
   if (shouldSkip) {
-    console.log(`[BLE] 当前运行在 devtools，已跳过 wx.${apiName}`);
+    debugLog(`[BLE] 当前运行在 devtools，已跳过 wx.${apiName}`);
   }
   return shouldSkip;
 }

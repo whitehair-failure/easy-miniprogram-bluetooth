@@ -6,6 +6,7 @@ import type { BLEHandlerConfig, CharacteristicCheckResult } from "../../types/bl
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 import { convertConfigUUIDs } from "../../utils/uuid";
 import { validateBLEHandlerConfig } from "../../utils/config";
+import { debugLog, debugWarn } from "../../utils/logger";
 
 export class ServiceManager {
   public readonly config: BLEHandlerConfig;
@@ -24,7 +25,7 @@ export class ServiceManager {
    */
   setBLEHandlerConfig(cfg: Partial<BLEHandlerConfig>): BLEHandlerConfig {
     if (!cfg || typeof cfg !== "object") {
-      throw new Error("Invalid config object");
+      throw new Error("配置对象无效");
     }
 
     // 验证传入的字段类型
@@ -33,15 +34,16 @@ export class ServiceManager {
       "writeCharacteristicId",
       "notifyCharacteristicId",
       "readCharacteristicId",
+      "notifyType",
     ];
 
     for (const key of Object.keys(cfg) as Array<string>) {
       if (!allowedKeys.includes(key as any)) {
-        throw new Error(`Unknown config key: ${key}`);
+        throw new Error(`未知的配置项: ${key}`);
       }
       const val = (cfg as any)[key];
       if (val != null && typeof val !== "string") {
-        throw new Error(`Invalid type for ${key}, expected string`);
+        throw new Error(`配置项 ${key} 类型无效，应为字符串`);
       }
     }
 
@@ -60,6 +62,7 @@ export class ServiceManager {
       this.config.notifyCharacteristicId = convertedCfg.notifyCharacteristicId;
     if (convertedCfg.readCharacteristicId)
       this.config.readCharacteristicId = convertedCfg.readCharacteristicId;
+    if (convertedCfg.notifyType) this.config.notifyType = convertedCfg.notifyType;
 
     return this.config;
   }
@@ -69,12 +72,12 @@ export class ServiceManager {
    * @throws {Error}
    */
   async getDeviceServices(deviceId: string): Promise<WechatMiniprogram.BLEService[]> {
-    console.log(`获取蓝牙设备所有服务...`);
+    debugLog(`获取蓝牙设备所有服务...`);
     if (shouldSkipBLEApiCall("getBLEDeviceServices")) {
       return [];
     }
     const res = await wx.getBLEDeviceServices({ deviceId });
-    console.log(`✔ 获取service成功！`, res);
+    debugLog(`✔ 获取service成功！`, res);
     return res.services || [];
   }
 
@@ -91,7 +94,7 @@ export class ServiceManager {
   ): Promise<CharacteristicCheckResult> {
     // 如果未配置 serviceUId 且未提供 serviceId，跳过验证
     if (!this.config.serviceUId && !serviceId) {
-      console.log(`serviceUId 未配置，跳过特征值验证`);
+      debugLog(`serviceUId 未配置，跳过特征值验证`);
       return { success: true };
     }
 
@@ -99,37 +102,35 @@ export class ServiceManager {
       return { success: true };
     }
 
-    console.log(`开始获取特征值...`);
+    debugLog(`开始获取特征值...`);
     const res = await wx.getBLEDeviceCharacteristics({
       deviceId,
       serviceId: serviceId || this.config.serviceUId || "",
     });
-    console.log(`✔ 获取特征值成功！`, res);
+    debugLog(`✔ 获取特征值成功！`, res);
 
     // 存储缺失的特征值ID
     const missingCharacteristics: string[] = [];
 
+    // 检查配置的特征值是否存在于设备返回的列表中（UUID 大小写不敏感比对）
+    const hasCharacteristic = (configId?: string): boolean =>
+      !configId ||
+      res?.characteristics.some(
+        (c: any) => (c.uuid || "").toUpperCase() === configId.toUpperCase(),
+      );
+
     // 检查写特征值（只有配置了才检查）
-    if (
-      this.config.writeCharacteristicId &&
-      !res?.characteristics.some((c: any) => c.uuid === this.config.writeCharacteristicId)
-    ) {
+    if (!hasCharacteristic(this.config.writeCharacteristicId)) {
       missingCharacteristics.push("writeCharacteristicId");
     }
 
     // 检查通知特征值（只有配置了才检查）
-    if (
-      this.config.notifyCharacteristicId &&
-      !res?.characteristics.some((c: any) => c.uuid === this.config.notifyCharacteristicId)
-    ) {
+    if (!hasCharacteristic(this.config.notifyCharacteristicId)) {
       missingCharacteristics.push("notifyCharacteristicId");
     }
 
     // 检查读特征值（只有配置了才检查）
-    if (
-      this.config.readCharacteristicId &&
-      !res?.characteristics.some((c: any) => c.uuid === this.config.readCharacteristicId)
-    ) {
+    if (!hasCharacteristic(this.config.readCharacteristicId)) {
       missingCharacteristics.push("readCharacteristicId");
     }
 
@@ -141,7 +142,7 @@ export class ServiceManager {
     // 如果有缺失的特征值，添加到结果中
     if (missingCharacteristics.length > 0) {
       result.missingCharacteristics = missingCharacteristics;
-      console.warn(`缺失以下特征值: ${missingCharacteristics.join(", ")}`);
+      debugWarn(`缺失以下特征值: ${missingCharacteristics.join(", ")}`);
     }
 
     return result;
@@ -168,13 +169,13 @@ export class ServiceManager {
 
     // 如果未配置 serviceUId 且未提供 serviceId，跳过通知订阅
     if (!serviceId && !this.config.serviceUId) {
-      console.log(`serviceUId 未配置，跳过特征值通知订阅`);
+      debugLog(`serviceUId 未配置，跳过特征值通知订阅`);
       return;
     }
 
     // 如果未配置 notifyCharacteristicId 且未提供 characteristicId，跳过通知订阅
     if (!characteristicId && !this.config.notifyCharacteristicId) {
-      console.log(`notifyCharacteristicId 未配置，跳过特征值通知订阅`);
+      debugLog(`notifyCharacteristicId 未配置，跳过特征值通知订阅`);
       return;
     }
 
@@ -182,8 +183,8 @@ export class ServiceManager {
       return;
     }
 
-    console.log(`准备订阅特征值变化...`);
-    console.log(`this.config`, this.config);
+    debugLog(`准备订阅特征值变化...`);
+    debugLog(`this.config`, this.config);
     await wx.notifyBLECharacteristicValueChange({
       deviceId,
       serviceId: serviceId || this.config.serviceUId || "",
@@ -191,7 +192,7 @@ export class ServiceManager {
       state: true,
       type: this.config.notifyType || "notification",
     });
-    console.log(`✔ 订阅特征值成功！`);
+    debugLog(`✔ 订阅特征值成功！`);
   }
 
   // Note: old name `notifyBLECharacteristicValueChange` removed. Use `enableCharacteristicNotification`.

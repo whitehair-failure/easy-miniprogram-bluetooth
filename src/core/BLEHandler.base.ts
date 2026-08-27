@@ -15,6 +15,7 @@ import { ConnectionManager } from "./modules/ConnectionManager";
 import { ServiceManager } from "./modules/ServiceManager";
 import { IOManager } from "./modules/IOManager";
 import { shouldSkipBLEApiCall } from "../utils/runtime";
+import { debugError, setDebugEnabled } from "../utils/logger";
 
 /**
  * 蓝牙工具类基类（抽象）
@@ -104,6 +105,11 @@ export abstract class BLEHandlerBase {
    * @param {BLEHandlerConstructor} options 配置选项
    */
   constructor(options: BLEHandlerConstructor) {
+    // 根据配置开启/关闭调试日志（仅显式传入 debug 时生效，默认静默）
+    if (options.debug !== undefined) {
+      setDebugEnabled(options.debug);
+    }
+
     this.connectTimeout = options.connectTimeout;
     this.reconnect = options.reconnect || false;
     this.maxRetries = options.maxRetries || 3;
@@ -294,7 +300,7 @@ export abstract class BLEHandlerBase {
    * 读取数据帧（由子类实现）
    * @throws {Error}
    */
-  abstract readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer>;
+  abstract readCharacteristicValue(options: readCharacteristicOption): Promise<number[]>;
 
   /**
    * 关闭蓝牙适配器
@@ -317,16 +323,20 @@ export abstract class BLEHandlerBase {
           try {
             await this.disconnectDevice(dev.deviceId);
           } catch (disErr) {
-            console.error(`Failed to disconnect device ${dev.deviceId}:`, disErr);
+            debugError(`断开设备 ${dev.deviceId} 失败:`, disErr);
           }
         }
       }
     }
 
     // 解绑全局监听器 + 重置 Manager 的标志位
-    if (!shouldSkipBLEApiCall("offBLE* listeners")) {
+    if (!shouldSkipBLEApiCall("offBLECharacteristicValueChange")) {
       wx.offBLECharacteristicValueChange();
+    }
+    if (!shouldSkipBLEApiCall("offBLEConnectionStateChange")) {
       wx.offBLEConnectionStateChange();
+    }
+    if (!shouldSkipBLEApiCall("offBluetoothDeviceFound")) {
       wx.offBluetoothDeviceFound();
     }
     this.connectionManager.offConnectionStateListener();

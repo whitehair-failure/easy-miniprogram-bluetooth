@@ -42,11 +42,13 @@ tsc --noEmit        # 类型检查（修改代码后必须执行）
 ├── types/
 │   └── ble.d.ts                      # 所有类型定义
 └── utils/
+    ├── config.ts                     # BLEHandlerConfig 校验（validateBLEHandlerConfig）
+    ├── logger.ts                     # 统一日志（debugLog/debugError/debugWarn，默认静默）
     ├── runtime.ts                    # 运行时环境判断（鸿蒙/devtools 跳过 BLE API）
     └── uuid.ts                       # UUID 工具（短 UUID → 128 位标准转换）`
 
 > ⚠️ BluetoothManager.ts **不存在**。旧文档中的该文件已在重构时移除。
-> ⚠️ BLEHandler.ts.backup 是重构前备份，**不参与编译**。
+> ⚠️ BLEHandler.ts.backup 已移至 doc/archive/，**不参与编译**。
 
 ---
 
@@ -88,11 +90,16 @@ connectTimeout?: number;
 maxRetries?: number;
 reconnectDelay?: number;
 mode?: "single" | "multiple"; // 仅文档用途，类型由子类决定
+debug?: boolean; // 是否开启调试日志（默认关闭静默，true 时输出调试日志）
 }
 
 interface writeCharacteristicOption extends WechatMiniprogram.WriteBLECharacteristicValueOption {
-hasResponse?: boolean;
-timeoutMs?: number;
+responseConfig?: {
+  hasResponse: boolean;
+  timeoutMs?: number;
+  serviceId?: string;
+  characteristicId?: string;
+}; // 可选：是否需要响应，默认 false；需要响应时指定超时、服务ID、特征ID
 }
 
 interface readCharacteristicOption extends WechatMiniprogram.ReadBLECharacteristicValueOption {
@@ -130,7 +137,7 @@ try {
 
 ` Typescript
 // 适配器与初始化
-getAdapterStatus(): Promise<void>
+getAdapterStatus(): Promise<WechatMiniprogram.GetBluetoothAdapterStateSuccessCallbackResult>
 openAdapter(): Promise<void>
 closeAdapter(): Promise<void>
 release(): Promise<void> // 完全释放资源，重置所有标志位，可再次调用 init()
@@ -177,7 +184,7 @@ getDeviceRSSI(): Promise<number>
 getDeviceServices(): Promise<WechatMiniprogram.BLEService[]>
 enableCharacteristicNotification(deviceId?: string, serviceId?: string, characteristicId?: string): Promise<void>
 writeCharacteristicValue(options: writeCharacteristicOption): Promise<void>
-readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer>
+readCharacteristicValue(options: readCharacteristicOption): Promise<number[]>
 `
 
 ### MultiDeviceBLEHandler（方法需传 deviceId）
@@ -189,13 +196,27 @@ getDeviceRSSI(deviceId: string): Promise<number>
 getDeviceServices(deviceId: string): Promise<WechatMiniprogram.BLEService[]>
 enableCharacteristicNotification(deviceId: string, serviceId?: string, characteristicId?: string): Promise<void>
 writeCharacteristicValue(options: writeCharacteristicOption): Promise<void>  // options.deviceId 必填
-readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer>  // options.deviceId 必填
+readCharacteristicValue(options: readCharacteristicOption): Promise<number[]>  // options.deviceId 必填
 `
 
 ### 兼容别名（index.ts）
 
 `	Typescript
 export { SingleDeviceBLEHandler as BLEHandler }  // 向后兼容
+`
+
+### 调试日志开关（模块级，默认静默）
+
+`	Typescript
+import { setDebugEnabled } from "miniprogram-bluetooth-utils";
+setDebugEnabled(true); // 默认关闭，需要调试时开启；关闭后所有 debugLog/debugError/debugWarn 静默
+`
+
+也可在初始化时通过构造参数开启（仅显式传入 `debug` 时生效）：
+
+`	Typescript
+const ble = new SingleDeviceBLEHandler({ searchOption, debug: true });
+await ble.init(); // 后续所有调试日志将输出
 `
 
 ---
@@ -246,10 +267,10 @@ export { SingleDeviceBLEHandler as BLEHandler }  // 向后兼容
 | 文档                                                                       | 用途                         |
 | -------------------------------------------------------------------------- | ---------------------------- |
 | [README.md](./README.md)                                                   | 用户文档、快速开始、API 概览 |
-| [doc/archive/EXAMPLES.md](./doc/archive/EXAMPLES.md)                       | 12+ 个完整可运行示例         |
-| [doc/archive/ARCHITECTURE.md](./doc/archive/ARCHITECTURE.md)               | 架构设计与设计模式           |
+| [doc/EXAMPLES.md](./doc/EXAMPLES.md)                                       | 12+ 个完整可运行示例         |
+| [doc/ARCHITECTURE.md](./doc/ARCHITECTURE.md)                               | 架构设计与设计模式           |
 | [doc/archive/DEVICE_FILTER_GUIDE.md](./doc/archive/DEVICE_FILTER_GUIDE.md) | 设备过滤详细指南             |
 | [doc/archive/RENAME.md](./doc/archive/RENAME.md)                           | 旧 API 新 API 迁移对照       |
-| [change-log](./change-log/*)                                               | 版本变更记录                 |
+| [change-log](./change-log/)                                                | 版本变更记录                 |
 
 ---

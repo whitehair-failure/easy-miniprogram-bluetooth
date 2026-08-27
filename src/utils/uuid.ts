@@ -2,6 +2,7 @@
  * UUID 转换工具函数
  * 支持将16位短UUID转换为标准128位UUID
  */
+import type { BLEHandlerConfig } from "../types/ble";
 
 /**
  * 判断是否为16位短UUID格式
@@ -39,7 +40,7 @@ export function convertShortUUIDToFull(shortUuid: string): string {
  * @param config 配置对象，包含可能的UUID字段
  * @returns 转换后的配置对象
  */
-export function convertConfigUUIDs(config: any): any {
+export function convertConfigUUIDs(config: BLEHandlerConfig): BLEHandlerConfig {
   if (!config || typeof config !== "object") return config;
 
   // UUID相关的字段名
@@ -48,16 +49,14 @@ export function convertConfigUUIDs(config: any): any {
     "readCharacteristicId",
     "writeCharacteristicId",
     "notifyCharacteristicId",
-  ];
+  ] as const;
 
-  const converted = { ...config };
+  const converted: BLEHandlerConfig = { ...config };
 
   for (const field of uuidFields) {
-    if (field in converted && converted[field]) {
-      const uuid = converted[field];
-      if (typeof uuid === "string") {
-        converted[field] = convertShortUUIDToFull(uuid);
-      }
+    const uuid = converted[field];
+    if (uuid && typeof uuid === "string") {
+      converted[field] = convertShortUUIDToFull(uuid);
     }
   }
 

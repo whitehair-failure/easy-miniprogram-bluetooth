@@ -4,6 +4,7 @@
  */
 import type { Device, SearchOption } from "../../types/ble";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
+import { debugLog, debugError } from "../../utils/logger";
 
 export class DiscoveryManager {
   private _foundDevList: Device[] = []; // 当前已找到的设备列表（私有）
@@ -89,15 +90,15 @@ export class DiscoveryManager {
     searchOption: WechatMiniprogram.StartBluetoothDevicesDiscoveryOption = this.searchOption,
   ) {
     try {
-      console.log(`准备搜寻附近的蓝牙外围设备...`);
+      debugLog(`准备搜寻附近的蓝牙外围设备...`);
       if (shouldSkipBLEApiCall("startBluetoothDevicesDiscovery")) {
         return { success: true };
       }
       const res = await wx.startBluetoothDevicesDiscovery(searchOption);
-      console.log(`搜索成功！`);
+      debugLog(`搜索成功！`);
       return res;
     } catch (err) {
-      console.error(`搜索蓝牙设备失败！`, err);
+      debugError(`搜索蓝牙设备失败！`, err);
       throw err;
     }
   }
@@ -116,7 +117,7 @@ export class DiscoveryManager {
     }
 
     wx.onBluetoothDeviceFound((res) => {
-      console.log("res.devices", res.devices);
+      debugLog("res.devices", res.devices);
 
       res.devices.forEach((device) => {
         // 使用新的过滤逻辑（同时检查 name 和 localName）
@@ -155,7 +156,7 @@ export class DiscoveryManager {
         try {
           callback(realTimeDevices);
         } catch (error) {
-          console.error("设备发现回调执行出错:", error);
+          debugError("设备发现回调执行出错:", error);
         }
       });
     });
@@ -204,6 +205,9 @@ export class DiscoveryManager {
   offDeviceFoundListener(): void {
     this.deviceFoundCallbacks.clear();
     this.isDeviceFoundListenerRegistered = false;
+    // 释放资源时清空设备列表，避免再次 init() 后残留旧数据
+    this._foundDevList = [];
+    this._historyDevList = [];
   }
 
   /**
@@ -213,17 +217,17 @@ export class DiscoveryManager {
    */
   async stopDeviceDiscovery() {
     try {
-      console.log(`停止查找新设备...`);
+      debugLog(`停止查找新设备...`);
       if (shouldSkipBLEApiCall("stopBluetoothDevicesDiscovery")) {
         this._foundDevList = [];
         return { success: true };
       }
       const res = await wx.stopBluetoothDevicesDiscovery();
-      console.log(`停止查找设备成功！`);
+      debugLog(`停止查找设备成功！`);
       this._foundDevList = [];
       return res;
     } catch (err) {
-      console.error(`停止查询设备失败！`, err);
+      debugError(`停止查询设备失败！`, err);
       throw err;
     }
   }

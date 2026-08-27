@@ -118,11 +118,11 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
    * @param {readCharacteristicOption} options 读取选项（必须包含 deviceId）
    * @throws {Error}
    */
-  async readCharacteristicValue(options: readCharacteristicOption): Promise<ArrayBuffer> {
+  async readCharacteristicValue(options: readCharacteristicOption): Promise<number[]> {
     if (!options.deviceId) {
       throw new Error("多设备模式下必须提供设备ID");
     }
     const result = await this.ioManager.readCharacteristicValue(options, "multiple");
-    return result?.value || new ArrayBuffer(0);
+    return result?.value || [];
   }
 }

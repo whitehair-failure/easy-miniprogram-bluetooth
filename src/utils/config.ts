@@ -10,7 +10,7 @@ import type { BLEHandlerConfig } from "../types/ble";
  */
 export function validateBLEHandlerConfig(config: BLEHandlerConfig): void {
   if (!config) {
-    throw new Error("BLEHandlerConfig is required");
+    throw new Error("BLEHandlerConfig 配置不能为空");
   }
 
   // serviceUId 是可选的，仅当提供时进行验证
@@ -18,7 +18,7 @@ export function validateBLEHandlerConfig(config: BLEHandlerConfig): void {
     config.serviceUId !== undefined &&
     (typeof config.serviceUId !== "string" || config.serviceUId.trim() === "")
   ) {
-    throw new Error("serviceUId must be a non-empty string or undefined");
+    throw new Error("serviceUId 必须是非空字符串或 undefined");
   }
 
   // 验证特征值 ID（如果提供）
@@ -30,7 +30,18 @@ export function validateBLEHandlerConfig(config: BLEHandlerConfig): void {
 
   for (const id of characteristicIds) {
     if (id !== undefined && (typeof id !== "string" || id.trim() === "")) {
-      throw new Error(`Invalid characteristic ID: ${id}. Must be a non-empty string or undefined`);
+      throw new Error(`特征值 ID 无效: ${id}，必须是非空字符串或 undefined`);
     }
+  }
+
+  // 验证通知类型（如果提供）
+  if (
+    config.notifyType !== undefined &&
+    config.notifyType !== "notification" &&
+    config.notifyType !== "indication"
+  ) {
+    throw new Error(
+      `notifyType 无效: ${config.notifyType}，必须是 "notification" 或 "indication"`,
+    );
   }
 }
