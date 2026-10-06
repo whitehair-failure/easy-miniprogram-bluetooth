@@ -30,11 +30,15 @@
   "keywords": [
     "miniprogram",
     "wechat",
+    "wechat-miniprogram",
+    "微信小程序",
+    "小程序",
     "bluetooth",
     "BLE",
-    "小程序",
+    "Bluetooth Low Energy",
     "蓝牙",
-    "低功耗蓝牙"
+    "低功耗蓝牙",
+    "easy-miniprogram-bluetooth"
   ],
   "author": "",
   "license": "MIT",

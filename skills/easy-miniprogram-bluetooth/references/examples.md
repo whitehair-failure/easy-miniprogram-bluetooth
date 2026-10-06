@@ -18,6 +18,8 @@
 
 ## 1. app.js：全局单例
 
+> 复制前先确认依赖已安装（`npm install easy-miniprogram-bluetooth@^0.4.1`，必须落在 `dependencies`），并已提示用户在微信开发者工具中执行「工具 → 构建 npm」。详见 `../SKILL.md` §2。
+
 要点：实例只建一次、`init()` 只调一次、业务只从 `getApp().globalData.BLEHandler` 拿实例。
 
 ```javascript

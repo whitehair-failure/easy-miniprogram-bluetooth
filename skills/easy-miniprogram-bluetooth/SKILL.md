@@ -1,7 +1,21 @@
 ---
 name: easy-miniprogram-bluetooth
-description: 'This skill should be used when integrating Bluetooth Low Energy into a WeChat Mini Program with the easy-miniprogram-bluetooth library — adapter init, device discovery with keyword filters, connect/disconnect, service and characteristic validation, notification subscription, data frame read/write with optional response waiting, auto-reconnect, and lifecycle release. It covers the current API surface, the standard encapsulation pattern (app-level singleton plus cross-page reuse), parameter and return contracts, common WeChat BLE error codes, and copy-paste example code.'
+description: 'This skill should be used when working with 微信小程序蓝牙 / WeChat Mini Program BLE (Bluetooth Low Energy) using the easy-miniprogram-bluetooth library — adapter init, device discovery with keyword filters, connect/disconnect, service and characteristic validation, notification subscription, data frame read/write with optional response waiting, auto-reconnect, and lifecycle release. It covers dependency installation, the current API surface, the standard encapsulation pattern (app-level singleton plus cross-page reuse), parameter and return contracts, common WeChat BLE error codes, and copy-paste example code. Trigger keywords include 微信小程序, 蓝牙, WeChat Mini Program, BLE, Bluetooth Low Energy, easy-miniprogram-bluetooth.'
 argument-hint: '目标设备的服务/特征值 UUID、单设备或多设备、以及业务收发需求'
+version: 0.4.1
+library: easy-miniprogram-bluetooth
+keywords:
+  - miniprogram
+  - wechat
+  - wechat-miniprogram
+  - 微信小程序
+  - 小程序
+  - bluetooth
+  - BLE
+  - Bluetooth Low Energy
+  - 蓝牙
+  - 低功耗蓝牙
+  - easy-miniprogram-bluetooth
 user-invocable: true
 disable-model-invocation: false
 agent_created: true
@@ -9,12 +23,14 @@ agent_created: true
 
 # 小程序蓝牙极速接入（easy-miniprogram-bluetooth）
 
+> **适用版本**：`easy-miniprogram-bluetooth@0.4.1`。本 Skill 描述的 API、类型与返回结构均以该版本为准；目标项目装的版本低于 0.4.1 时，先按 §2 升级再使用，否则引入路径与类型产物形态会不一致。
+
 ## 1. 适用场景
 
 ### 应当使用本 Skill 的场景
 
 - 在微信小程序中与 BLE 外设通信（智能灯、工业控制器、传感器、手环等），需要走通「初始化 → 搜索 → 连接 → 收发」全链路。
-- 项目已引入 `easy-miniprogram-bluetooth`，需要按统一模式在多个页面复用同一个蓝牙实例。
+- 项目需要接入本库（`easy-miniprogram-bluetooth`）—— **无论是否已安装**，都应先按 §2 完成依赖检查与安装，再写业务代码。
 - 需要把设备发现做关键字白名单/黑名单过滤（只显示本厂商设备）。
 - 需要「发送指令后等待设备回包」的问答式协议（带超时）。
 - 需要连接异常断开后自动重连、以及重连间隔/次数可调。
@@ -28,18 +44,54 @@ agent_created: true
 
 ### 触发关键词
 
-小程序蓝牙、BLE、低功耗蓝牙、连接设备、搜索设备、收发数据、特征值、通知订阅、自动重连、`BLEHandler`、`SingleDeviceBLEHandler`、`MultiDeviceBLEHandler`、`easy-miniprogram-bluetooth`。
+微信小程序、蓝牙、WeChat Mini Program、BLE、Bluetooth Low Energy、easy-miniprogram-bluetooth，以及：低功耗蓝牙、连接设备、搜索设备、收发数据、特征值、通知订阅、自动重连、`BLEHandler`、`SingleDeviceBLEHandler`、`MultiDeviceBLEHandler`。
 
 ---
 
-## 2. 安装与引入
+## 2. 第 0 步：确认依赖已安装（必须先做）
+
+**在写任何业务代码之前，先确认目标小程序项目已安装本库；未安装则由助手直接执行安装，不要把这一步甩给用户。**
 
 ```bash
-# 必须用 npm install（不要 -D）：开发者工具只对 dependencies 下的包执行「构建 npm」
-npm install easy-miniprogram-bluetooth
+# 检测是否已安装（在目标小程序项目根目录执行，输出 installed / missing）
+node -p "(()=>{try{require('fs').accessSync('node_modules/easy-miniprogram-bluetooth');return 'installed'}catch(e){return 'missing'}})()"
 ```
 
-引入方式二选一：
+若输出 `missing`（或项目根本没有 `package.json`，即尚未初始化），执行安装：
+
+```bash
+# 必须用 npm install，不能加 -D / --save-dev：
+# 微信开发者工具只扫描 dependencies 下的包参与「构建 npm」，devDependencies 不会被编译
+# 建议锁定到本 Skill 描述的版本，避免 API 语义随 minor 漂移
+npm install easy-miniprogram-bluetooth@^0.4.1
+```
+
+已安装的项目，用同一条命令核对版本是否满足：
+
+```bash
+# 输出已安装版本，与本 Skill 的 0.4.1 比对
+node -p "require('./node_modules/easy-miniprogram-bluetooth/package.json').version"
+```
+
+版本低于 `0.4.1` 时，**先提示用户升级**再写代码：0.4.1 之前 ESM 产物名为 `index.esm.js`（按包名或目录短路径引入会失败）、类型声明是多文件树且公共类型无法从包根导入，写法与本 Skill 不通用。
+
+安装后需要确认的三件事：
+
+| 事项 | 说明 |
+| --- | --- |
+| 落到 `dependencies` | `package.json` 的 `dependencies` 中应出现 `easy-miniprogram-bluetooth`；若误装进 `devDependencies`，先 `npm uninstall` 再按上条重装 |
+| 版本 ≥ 0.4.1 | 低于该版本先升级（见上一段） |
+| 执行「构建 npm」 | 这是**微信开发者工具里的手动操作，助手无法代劳**，需提示用户在 IDE 中执行：工具 → 构建 npm |
+
+无法执行「构建 npm」时的降级方案：把本库 `dist/` 目录拷进小程序项目（例如放到 `utils/dist/`），再按相对路径引入 `../../utils/dist`（对应 `dist/index.js`）。
+
+TypeScript 项目若需要完整的 `WechatMiniprogram.*` 类型：`npm install -D miniprogram-api-typings`。
+
+---
+
+## 3. 引入方式（速查）
+
+依赖安装见 §2，完成后按下面二选一引入：
 
 ```javascript
 // 方式 A（推荐）：构建 npm 后按包名引入
@@ -56,7 +108,7 @@ import { BLEHandler, SingleDeviceBLEHandler, MultiDeviceBLEHandler } from 'easy-
 
 ---
 
-## 3. 标准封装思路（三层）
+## 4. 标准封装思路（三层）
 
 照搬以下分层，代码才可跨页面复用、可控地释放：
 
@@ -75,7 +127,7 @@ import { BLEHandler, SingleDeviceBLEHandler, MultiDeviceBLEHandler } from 'easy-
 
 ---
 
-## 4. 核心 API 清单
+## 5. 核心 API 清单
 
 ### 构造参数（`BLEHandlerConstructor`）
 
@@ -153,9 +205,10 @@ import { BLEHandler, SingleDeviceBLEHandler, MultiDeviceBLEHandler } from 'easy-
 
 ---
 
-## 5. 调用流程步骤
+## 6. 调用流程步骤
 
 ```
+⓪ 确认依赖            → 检测 easy-miniprogram-bluetooth 是否已装；未装则 npm install（见 §2）
 ① app.js 建单例        → globalData.BLEHandler = new SingleDeviceBLEHandler(options)
 ② 页面 onLoad 授权     → wx.getSetting → 缺 scope.bluetooth 则 wx.authorize
 ③ init()              → 打开适配器 + 注册全局监听器（只调一次）
@@ -169,14 +222,15 @@ import { BLEHandler, SingleDeviceBLEHandler, MultiDeviceBLEHandler } from 'easy-
 
 关键顺序约束：
 
+- **⓪ 依赖检查是硬前置**：库没装就写代码，必然在「构建 npm」或运行时报模块找不到。助手应自行完成安装（§2），只把「工具 → 构建 npm」这一步留给用户。
 - `init()` 必须在搜索/连接/读写之前。
 - 搜索与连接**不要并行**：先 `startDeviceDiscovery` 拿到设备，连接成功后立刻 `stopDeviceDiscovery`，否则安卓侧扫描会干扰连接。
-- `connectDevice` 成功后无需手动 `getDeviceServices` / `enableCharacteristicNotification`，内部已经串行做过（但特征值校验结果不会抛出，需自行检查，见 §6.5）。
+- `connectDevice` 成功后无需手动 `getDeviceServices` / `enableCharacteristicNotification`，内部已经串行做过（但特征值校验结果不会抛出，需自行检查，见 §7.5）。
 - 自动重连是**内置能力**：`reconnect: true` 时，异常断开由连接状态监听器自动触发，不要自己在页面上写重连定时器。
 
 ---
 
-## 6. 关键契约与易踩的坑（务必先读）
+## 7. 关键契约与易踩的坑（务必先读）
 
 1. **异常模型**：所有方法 `throw`，不返回元组。微信原生 API 失败时原样抛出微信错误对象（含 `errMsg` / `errno` / `errCode`）；参数校验与超时抛原生 `Error`，**超时消息含「超时」二字**（如 `写入响应超时 - 请求ID: req_3, 设备: ...`）。判断类型读字段，不要用 `instanceof`。
 2. **`readCharacteristicValue` 返回 `number[]`**（字节数组），不是 `ArrayBuffer`。需要 buffer 时用 `new Uint8Array(bytes).buffer`。
@@ -209,7 +263,7 @@ import { BLEHandler, SingleDeviceBLEHandler, MultiDeviceBLEHandler } from 'easy-
 
 ---
 
-## 7. 常见错误码及处理建议（速查）
+## 8. 常见错误码及处理建议（速查）
 
 判断时 **`errno` 与 `errCode` 都要看**（iOS 与安卓填充字段不同）。
 
@@ -235,7 +289,7 @@ import { BLEHandler, SingleDeviceBLEHandler, MultiDeviceBLEHandler } from 'easy-
 
 ---
 
-## 8. 参考示例代码
+## 9. 参考示例代码
 
 最小可用骨架（完整可运行版本见 `references/examples.md`）：
 
@@ -359,8 +413,9 @@ if (res?.value?.[0] !== 0x39) console.warn('设备返回异常状态码', res?.v
 
 ---
 
-## 9. 交付前验证清单
+## 10. 交付前验证清单
 
+- [ ] `easy-miniprogram-bluetooth` 已装进 `dependencies`（不是 `devDependencies`），且已提示用户执行「工具 → 构建 npm」。
 - [ ] `app.js` 中只有一个 BLE 实例，页面不重复 `new`。
 - [ ] `init()` 有守卫，不会被页面生命周期反复调用。
 - [ ] 每个 `addXxxListener()` 的解绑函数都在 `onUnload` 里执行。
@@ -368,11 +423,12 @@ if (res?.value?.[0] !== 0x39) console.warn('设备返回异常状态码', res?.v
 - [ ] 所有 BLE 调用都在 `try/catch` 中，且对用户有可见反馈（toast/modal）。
 - [ ] `config` 中的 `serviceUId` / `writeCharacteristicId` / `notifyCharacteristicId` 来自真机 `getDeviceServices()` 打印结果，不是猜的。
 - [ ] `hasResponse: true` 的发送在同一特征值上串行或节流。
+- [ ] 上线前调试日志已按需关闭（`setDebugEnabled(false)` 或构造传 `debug: false`）。
 - [ ] 在**真机**（安卓 + iOS 各一台）上跑通搜索 → 连接 → 收发 → 断连重连。
 
 ---
 
-## 10. 参考文件
+## 11. 参考文件
 
 | 文件 | 内容 |
 | --- | --- |

@@ -3,6 +3,7 @@
 微信小程序低功耗蓝牙（BLE）工具封装库，提供简洁的 Promise API 来管理设备发现、连接、通知订阅与数据读写。
 
 > 接入实战指南（含分层封装模式、易踩坑清单、错误码表、可复制示例）见 [`skills/easy-miniprogram-bluetooth/`](./skills/easy-miniprogram-bluetooth/SKILL.md)。
+> 让 AI 助手自动按这套模式写代码，可一行命令装成 Skill，见 [作为 Skill 接入](#作为-skill-接入ai-助手--agent)。
 
 ## 特性
 
@@ -35,6 +36,24 @@ import { BLEHandler } from "easy-miniprogram-bluetooth";
 也可以直接复制 `dist/` 到小程序项目中，按相对路径引入（对应 `dist/index.js`）。
 
 > TypeScript 消费者若需显式标注 BLE 类型，建议自行安装类型包：`npm install -D miniprogram-api-typings`。本库的公共签名引用了 `WechatMiniprogram.*` 命名空间，开启 `skipLibCheck` 时不会报错，但类型会退化为 `any`。
+
+## 作为 Skill 接入（AI 助手 / Agent）
+
+本库自带一份接入 Skill，覆盖依赖检查与安装、分层封装模式、调用流程、易踩坑清单、微信 BLE 错误码兜底与可复制示例。一行命令即可装到支持 Skills 的环境中：
+
+```bash
+npx skills add https://github.com/whitehair-failure/easy-miniprogram-bluetooth --skill easy-miniprogram-bluetooth
+```
+
+> 该 Skill 对应库版本 **0.4.1**，示例与 API 说明均以该版本为准。
+
+装好后可按名字显式调用 `easy-miniprogram-bluetooth`，助手也会依据描述自动触发（例如「用微信小程序蓝牙连接设备并收发数据」）。它会引导助手：
+
+1. 先检测 `easy-miniprogram-bluetooth` 是否已在目标项目的 `dependencies` 中，未安装则直接执行 `npm install`（不会用 `-D`，避免开发者工具不参与「构建 npm」）；
+2. 提示你在微信开发者工具中执行**工具 → 构建 npm**（这步只能手动操作）；
+3. 按「`app.js` 单例 → 页面注册监听 → 协议层收发」三层结构生成代码，并附上错误处理与生命周期释放。
+
+不想装 Skill，也可以直接阅读 [`skills/easy-miniprogram-bluetooth/SKILL.md`](./skills/easy-miniprogram-bluetooth/SKILL.md)。
 
 ## 导出 API
 
@@ -406,7 +425,8 @@ npm run format:check  # Prettier 校验
 
 ## 文档
 
-- [接入指南（Skill）](./skills/easy-miniprogram-bluetooth/SKILL.md) — 分层封装模式、调用流程、易踩坑清单、错误码表
+- 接入 Skill 安装：`npx skills add https://github.com/whitehair-failure/easy-miniprogram-bluetooth --skill easy-miniprogram-bluetooth`
+- [接入指南（Skill）](./skills/easy-miniprogram-bluetooth/SKILL.md) — 依赖安装、分层封装模式、调用流程、易踩坑清单、错误码表
 - [完整 API 契约](./skills/easy-miniprogram-bluetooth/references/api-reference.md)
 - [错误处理与错误码](./skills/easy-miniprogram-bluetooth/references/error-handling.md)
 - [可复制示例](./skills/easy-miniprogram-bluetooth/references/examples.md)
