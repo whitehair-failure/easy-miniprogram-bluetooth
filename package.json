@@ -1,23 +1,25 @@
 {
-  "name": "miniprogram-bluetooth-utils",
-  "version": "0.1.0",
+  "name": "easy-miniprogram-bluetooth",
+  "version": "0.4.1",
   "description": "微信小程序低功耗蓝牙（BLE）工具封装",
   "main": "dist/index.cjs.js",
-  "module": "dist/index.esm.js",
+  "module": "dist/index.js",
+  "miniprogram": "dist",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.esm.js",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "require": "./dist/index.cjs.js",
       "default": "./dist/index.cjs.js"
     },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "rollup -c",
+    "build": "npx rimraf dist && rollup -c",
     "clean": "npx rimraf dist rollup",
     "prepare": "npm run build",
     "lint": "eslint .",
@@ -38,12 +40,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/whitehair-failure/miniprogram-bluetooth-utils"
+    "url": "https://github.com/whitehair-failure/easy-miniprogram-bluetooth"
   },
   "bugs": {
-    "url": "https://github.com/whitehair-failure/miniprogram-bluetooth-utils/issues"
+    "url": "https://github.com/whitehair-failure/easy-miniprogram-bluetooth/issues"
   },
-  "homepage": "https://github.com/whitehair-failure/miniprogram-bluetooth-utils#readme",
+  "homepage": "https://github.com/whitehair-failure/easy-miniprogram-bluetooth#readme",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-node-resolve": "^16.0.1",
@@ -55,6 +57,7 @@
     "miniprogram-api-typings": "^4.0.7",
     "prettier": "^3.9.6",
     "rollup": "^4.44.1",
+    "rollup-plugin-dts": "^6.5.1",
     "rollup-plugin-typescript2": "^0.36.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.67.0"

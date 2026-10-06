@@ -2,26 +2,8 @@
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import typescript from "rollup-plugin-typescript2";
+import dts from "rollup-plugin-dts";
 import terser from "@rollup/plugin-terser";
-import fs from "node:fs";
-import path from "node:path";
-
-// 复制手写的类型声明文件（src/types/*.d.ts）到 dist/types/，
-// 因为 rollup-plugin-typescript2 只处理入口链上的 .ts 文件，不会复制独立 .d.ts。
-// 否则 dist/core/*.d.ts 里 `import ... from "../types/ble"` 会悬空。
-const copyTypesPlugin = {
-  name: "copy-types",
-  writeBundle() {
-    const srcDir = path.resolve("src/types");
-    const outDir = path.resolve("dist/types");
-    fs.mkdirSync(outDir, { recursive: true });
-    for (const file of fs.readdirSync(srcDir)) {
-      if (file.endsWith(".d.ts")) {
-        fs.copyFileSync(path.join(srcDir, file), path.join(outDir, file));
-      }
-    }
-  },
-};
 
 // 共享的压缩配置（每个产物单独创建 terser 实例，避免共享实例状态）
 const terserOptions = {
@@ -35,30 +17,43 @@ const terserOptions = {
   },
 };
 
-export default {
-  input: "src/index.ts", // 打包入口
-  output: [
-    {
-      file: "dist/index.cjs.js",
-      format: "cjs", // CommonJS，适用于 require()
-      sourcemap: false,
-      plugins: [terser(terserOptions)],
+// 共享的 JS 编译插件链
+const jsPlugins = [resolve(), commonjs(), typescript()];
+
+export default [
+  // 1) JS 产物：CJS（Node / 旧打包器）+ ESM（微信小程序入口）
+  {
+    input: "src/index.ts", // 打包入口
+    output: [
+      {
+        file: "dist/index.cjs.js",
+        format: "cjs", // CommonJS，适用于 require()
+        sourcemap: false,
+        plugins: [terser(terserOptions)],
+      },
+      {
+        // 微信小程序 npm 入口：包名根目录下必须有 index.js，
+        // 否则开发者工具「构建 npm」后 require("包名") 找不到入口。
+        // 参见 package.json 的 miniprogram / module / exports 配置。
+        file: "dist/index.js",
+        format: "esm", // ESM，适用于 import（小程序原生支持 ESM 语法）
+        sourcemap: false,
+        plugins: [terser(terserOptions)],
+      },
+    ],
+    // 注：wx 作为全局变量使用（非 import），无需 external 标记
+    plugins: jsPlugins,
+  },
+
+  // 2) 类型声明：把整棵类型依赖树合并为单个 dist/index.d.ts
+  //    输入直接取 src 入口，由插件自己从源码生成声明并合并，
+  //    因此不再需要 copyTypesPlugin 去补 dist/types/ —— 内容会被内联。
+  {
+    input: "src/index.ts",
+    output: {
+      file: "dist/index.d.ts",
+      format: "es",
     },
-    {
-      file: "dist/index.esm.js",
-      format: "esm", // ESM，适用于 import
-      sourcemap: false,
-      plugins: [terser(terserOptions)],
-    },
-  ],
-  // 注：wx 作为全局变量使用（非 import），无需 external 标记
-  plugins: [
-    resolve(),
-    commonjs(),
-    // 使用 tsconfig 的配置生成类型声明文件
-    typescript({
-      useTsconfigDeclarationDir: true,
-    }),
-    copyTypesPlugin,
-  ],
-};
+    plugins: [dts()],
+  },
+];

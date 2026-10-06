@@ -5,7 +5,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 import globals from "globals";
 
 export default tseslint.config(
-  // 全局忽略：构建产物、依赖、文档归档等不参与 lint
+  // 全局忽略：构建产物、依赖、文档等不参与 lint
   {
     ignores: [
       "node_modules/**",
@@ -14,7 +14,6 @@ export default tseslint.config(
       "out/**",
       "build/**",
       "change-log/**",
-      "doc/**",
       "skills/**",
       ".workbuddy/**",
     ],

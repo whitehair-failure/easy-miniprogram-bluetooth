@@ -1,13 +1,13 @@
 /**
  * 统一日志工具
- * 默认静默，通过 setDebugEnabled(true) 开启调试日志输出，
- * 避免库在宿主小程序中污染控制台。
+ * 默认开启（debugEnabled = true），输出调试日志便于排查；
+ * 如需在生产环境静默，调用 setDebugEnabled(false) 或构造时传 debug: false。
  */
 
 let debugEnabled = true;
 
 /**
- * 设置是否开启调试日志（默认关闭）
+ * 设置是否开启调试日志（默认开启）
  * @param enabled 是否开启
  */
 export function setDebugEnabled(enabled: boolean): void {

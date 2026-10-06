@@ -26,7 +26,7 @@ export interface BLEHandlerConstructor {
   maxRetries?: number; // 最大自动重连次数
   reconnectDelay?: number; // 每次自动重连间隔时间，单位毫秒
   mode?: "single" | "multiple";
-  debug?: boolean; // 是否开启调试日志（默认关闭静默，true 时输出 debugLog/debugError/debugWarn）
+  debug?: boolean; // 是否开启调试日志（默认开启；显式传 false 可全局关闭）
 }
 
 export interface CharacteristicCheckResult {
@@ -60,3 +60,7 @@ export interface CharacteristicValueResult {
   characteristicId: string;
   value: number[]; // 原始 ArrayBuffer 转为普通字节数组
 }
+
+// getDeviceRSSI 的返回结果，与 wx.getBLEDeviceRSSI 成功回调保持一致
+// 注意：这是一个对象（取信号强度请用 res.RSSI），不是裸 number
+export type DeviceRSSIResult = WechatMiniprogram.GetBLEDeviceRSSISuccessCallbackResult;

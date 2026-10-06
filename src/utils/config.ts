@@ -40,8 +40,6 @@ export function validateBLEHandlerConfig(config: BLEHandlerConfig): void {
     config.notifyType !== "notification" &&
     config.notifyType !== "indication"
   ) {
-    throw new Error(
-      `notifyType 无效: ${config.notifyType}，必须是 "notification" 或 "indication"`,
-    );
+    throw new Error(`notifyType 无效: ${config.notifyType}，必须是 "notification" 或 "indication"`);
   }
 }

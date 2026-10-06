@@ -1,6 +1,7 @@
 import type {
   Device,
   BLEHandlerConstructor,
+  DeviceRSSIResult,
   writeCharacteristicOption,
   readCharacteristicOption,
 } from "../types/ble";
@@ -60,9 +61,10 @@ export class MultiDeviceBLEHandler extends BLEHandlerBase {
   /**
    * 获取蓝牙设备信号强度
    * @param {string} deviceId 设备ID（必需）
+   * @returns 结果对象，信号强度取 `res.RSSI`
    * @throws {Error}
    */
-  async getDeviceRSSI(deviceId: string): Promise<number> {
+  async getDeviceRSSI(deviceId: string): Promise<DeviceRSSIResult> {
     if (!deviceId) {
       throw new Error("多设备模式下必须提供设备ID");
     }

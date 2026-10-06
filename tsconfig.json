@@ -3,13 +3,11 @@
     "target": "ES5", // 微信小程序支持 ES5+
     "module": "ESNext", // ESNext 模块系统（由 Rollup 打包为 CJS/ESM 双产物）
     "lib": ["ES2015", "dom", "es2018"], // Promise/Map 等；"dom" 提供 setTimeout 等全局类型
-    "declaration": true, // 生成 .d.ts 类型声明文件
+    "declaration": false, // 不再由 tsc 逐文件产出 .d.ts：类型声明统一由 rollup-plugin-dts 合并为单个 dist/index.d.ts（见 rollup.config.mjs）
     "sourceMap": false, // 关闭 source map（发布产物无需）
     "inlineSources": false, // 不将源代码内联到 source map 中
     // 输出到本仓库的 dist，避免意外写到其他工程
     "outDir": "./dist",
-    // 声明文件输出目录（rollup/typescript 插件会使用此值）
-    "declarationDir": "./dist",
     "rootDir": "./src", // 源码目录
     "strict": true, // 开启所有严格类型检查
     "esModuleInterop": true, // 支持默认导入（import xxx from 'xxx'）

@@ -1,6 +1,7 @@
 import type {
   Device,
   BLEHandlerConstructor,
+  DeviceRSSIResult,
   writeCharacteristicOption,
   readCharacteristicOption,
 } from "../types/ble";
@@ -59,9 +60,10 @@ export class SingleDeviceBLEHandler extends BLEHandlerBase {
 
   /**
    * 获取蓝牙设备信号强度
+   * @returns 结果对象，信号强度取 `res.RSSI`
    * @throws {Error}
    */
-  async getDeviceRSSI(): Promise<number> {
+  async getDeviceRSSI(): Promise<DeviceRSSIResult> {
     const singleDeviceId = this.singleConnectedDevice?.deviceId;
     if (!singleDeviceId) {
       throw new Error("获取蓝牙设备信号强度失败，单设备模式下未连接任何设备");

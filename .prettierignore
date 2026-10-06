@@ -5,9 +5,8 @@ rollup/
 out/
 build/
 
-# 文档归档与示例（不参与格式化）
+# 变更日志与 Skill 文档（不参与格式化）
 change-log/
-doc/
 skills/
 
 # 锁定文件

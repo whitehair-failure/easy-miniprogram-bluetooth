@@ -4,6 +4,7 @@ import type {
   BLEHandlerConfig,
   BLEHandlerConstructor,
   CharacteristicCheckResult,
+  DeviceRSSIResult,
   writeCharacteristicOption,
   readCharacteristicOption,
 } from "../types/ble";
@@ -105,7 +106,7 @@ export abstract class BLEHandlerBase {
    * @param {BLEHandlerConstructor} options 配置选项
    */
   constructor(options: BLEHandlerConstructor) {
-    // 根据配置开启/关闭调试日志（仅显式传入 debug 时生效，默认静默）
+    // 根据配置开启/关闭调试日志（默认开启，仅显式传入 debug 时改变全局开关状态）
     if (options.debug !== undefined) {
       setDebugEnabled(options.debug);
     }
@@ -234,9 +235,10 @@ export abstract class BLEHandlerBase {
 
   /**
    * 获取蓝牙设备信号强度（由子类实现）
+   * @returns 结果对象，信号强度取 `res.RSSI`
    * @throws {Error}
    */
-  abstract getDeviceRSSI(deviceId?: string): Promise<number>;
+  abstract getDeviceRSSI(deviceId?: string): Promise<DeviceRSSIResult>;
 
   /**
    * 获取蓝牙设备的所有服务（由子类实现）

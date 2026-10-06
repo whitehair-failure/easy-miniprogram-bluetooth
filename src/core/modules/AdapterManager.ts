@@ -2,6 +2,7 @@
  * AdapterManager - 蓝牙适配器管理模块
  * 负责适配器的初始化、状态检查、关闭等操作
  */
+import type { DeviceRSSIResult } from "../../types/ble";
 import { shouldSkipBLEApiCall } from "../../utils/runtime";
 import { debugLog, debugError } from "../../utils/logger";
 
@@ -78,13 +79,13 @@ export class AdapterManager {
   /**
    * 获取蓝牙设备信号强度
    * @param {string} deviceId 设备ID
-   * @returns {Promise<any>} RSSI 结果
+   * @returns {Promise<DeviceRSSIResult>} 与 wx.getBLEDeviceRSSI 一致的结果对象，信号强度取 `res.RSSI`
    * @throws {Error} 获取失败
    */
-  async getDeviceRSSI(deviceId: string): Promise<any> {
+  async getDeviceRSSI(deviceId: string): Promise<DeviceRSSIResult> {
     try {
       if (shouldSkipBLEApiCall("getBLEDeviceRSSI")) {
-        return { RSSI: 0 };
+        return { RSSI: 0 } as DeviceRSSIResult;
       }
       const res = await wx.getBLEDeviceRSSI({ deviceId });
       debugLog(`✔ 获取信号强度成功!`);
